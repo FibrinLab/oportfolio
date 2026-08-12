@@ -8,10 +8,12 @@ import {
   cohort,
   duty,
   enrolment,
+  evidenceType,
   membership,
   policySet,
   profile,
   programme,
+  provenanceType,
   supervisorAssignment,
   tenant,
 } from "@/server/db/schema";
@@ -86,6 +88,37 @@ async function main() {
         description: "Twelve-month clinical AI fellowship alongside a clinical role.",
         defaultDurationMonths: 12,
       });
+    }
+
+    // Eight canonical evidence types (spec/05:103) and four canonical
+    // provenance types (spec/05:107) — global rows (tenant NULL).
+    const canonicalTypes: Array<[string, string, string]> = [
+      ["learning_record", "Learning record", "A learning activity, module, course session or self-directed study."],
+      ["reflection", "Reflection", "A private-by-default reflective note on practice and learning."],
+      ["certificate", "Certificate", "A completion or attendance certificate."],
+      ["award", "Award", "A prize or formal recognition."],
+      ["poster", "Poster", "A poster presented at an event."],
+      ["publication", "Publication", "A paper, preprint, chapter or article."],
+      ["presentation", "Presentation", "A talk, teaching session or demonstration."],
+      ["code_artifact", "Code artefact", "A repository, commit, pull request, release or notebook, recorded as a link."],
+    ];
+    for (const [stableCode, label, description] of canonicalTypes) {
+      await tx
+        .insert(evidenceType)
+        .values({ id: uuidv7(), tenantId: null, stableCode, label, description, canonical: true })
+        .onConflictDoNothing();
+    }
+    const canonicalProvenances: Array<[string, string]> = [
+      ["immersive_project", "Immersive clinical AI project"],
+      ["workshop", "Workshop"],
+      ["e_learning", "E-learning"],
+      ["networking", "Networking"],
+    ];
+    for (const [stableCode, label] of canonicalProvenances) {
+      await tx
+        .insert(provenanceType)
+        .values({ id: uuidv7(), tenantId: null, stableCode, label, canonical: true })
+        .onConflictDoNothing();
     }
 
     // Fellowship duties: programme-scoped copies of the package taxonomy

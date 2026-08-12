@@ -1,0 +1,64 @@
+.editorShell {
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-control);
+  background: var(--paper);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--rule);
+  padding: var(--space-1);
+}
+
+.toolButton {
+  min-width: var(--target-min);
+  min-height: 36px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: 0 var(--space-2);
+}
+
+.toolButton[data-active="true"] {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.prose {
+  min-height: 220px;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  line-height: var(--leading-body);
+  max-width: var(--measure);
+  outline: none;
+}
+
+.prose:focus-visible {
+  outline: none;
+}
+
+.editorShell:focus-within {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+
+.prose p {
+  margin-bottom: var(--space-3);
+}
+
+.prose h2,
+.prose h3 {
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: var(--space-5);
+  margin-bottom: var(--space-3);
+}

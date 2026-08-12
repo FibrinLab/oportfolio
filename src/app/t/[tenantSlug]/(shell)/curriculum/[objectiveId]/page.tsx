@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getActor, resolveTenant } from "@/server/policy/actor";
 import { getObjectiveDetail, getOwnEnrolment } from "@/server/framework/queries";
+import { listEvidenceForObjective } from "@/server/portfolio/evidence";
+import { formatDateUk } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Objective" };
 
@@ -26,6 +28,8 @@ export default async function ObjectiveDetailPage({
   if (!enrolmentContext) notFound();
   const detail = await getObjectiveDetail(actor, enrolmentContext, objectiveId);
   if (!detail) notFound();
+
+  const mappedEvidence = await listEvidenceForObjective(actor, enrolmentContext, objectiveId);
 
   return (
     <>
@@ -66,11 +70,38 @@ export default async function ObjectiveDetailPage({
 
       <section aria-labelledby="evidence-heading" style={{ marginBottom: "var(--space-6)" }}>
         <h2 id="evidence-heading" style={{ marginBottom: "var(--space-2)" }}>
-          Mapped evidence
+          Mapped evidence ({mappedEvidence.length})
         </h2>
-        <p style={{ maxWidth: "var(--measure)", color: "var(--disabled-text)" }}>
-          Evidence you map to this objective will appear here. Mapped evidence is a count
-          and review aid, not proof of competence.
+        {mappedEvidence.length === 0 ? (
+          <p style={{ maxWidth: "var(--measure)", color: "var(--disabled-text)" }}>
+            Evidence you map to this objective will appear here.
+          </p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, maxWidth: "var(--measure)" }}>
+            {mappedEvidence.map((item) => (
+              <li key={item.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--space-2) 0" }}>
+                <Link href={`/t/${tenantSlug}/log/${item.id}`} style={{ fontWeight: 700 }}>
+                  {item.title}
+                </Link>
+                {item.activityDate ? (
+                  <span style={{ display: "block", fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
+                    {formatDateUk(item.activityDate)}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p style={{ maxWidth: "var(--measure)", color: "var(--disabled-text)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
+          Mapped evidence is a count and review aid, not proof of competence.
+        </p>
+        <p style={{ marginTop: "var(--space-3)" }}>
+          <Link href={`/t/${tenantSlug}/log/new?objective=${detail.objective.id}`}>
+            Add evidence for this objective
+          </Link>{" "}
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
+            (new entries still start private)
+          </span>
         </p>
       </section>
 

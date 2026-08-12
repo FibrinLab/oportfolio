@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getActor, resolveTenant } from "@/server/policy/actor";
 import { getCurriculumForEnrolment, getOwnEnrolment } from "@/server/framework/queries";
+import { getObjectiveCoverage } from "@/server/portfolio/evidence";
 import { formatDateUk } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Curriculum" };
@@ -25,6 +26,11 @@ export default async function CurriculumPage({
 
   const { release, domains } = curriculum;
   const totalObjectives = domains.reduce((sum, d) => sum + d.objectives.length, 0);
+  const coverage = await getObjectiveCoverage(actor, enrolmentContext);
+  const coveredTotal = domains.reduce(
+    (sum, d) => sum + d.objectives.filter((o) => (coverage.get(o.id) ?? 0) > 0).length,
+    0,
+  );
 
   return (
     <>
@@ -53,7 +59,8 @@ export default async function CurriculumPage({
       </p>
 
       <p style={{ marginBottom: "var(--space-5)" }}>
-        {domains.length} domains, {totalObjectives} objectives.
+        {domains.length} domains, {totalObjectives} objectives. Coverage: {coveredTotal} of{" "}
+        {totalObjectives} objectives have mapped evidence — mapped evidence, not competence.
       </p>
 
       {domains.map((dom) => (
@@ -72,7 +79,8 @@ export default async function CurriculumPage({
           >
             {dom.code} — {dom.title}{" "}
             <span style={{ fontWeight: 400, fontSize: "var(--text-sm)" }}>
-              ({dom.objectives.length} objectives)
+              ({dom.objectives.filter((o) => (coverage.get(o.id) ?? 0) > 0).length} of{" "}
+              {dom.objectives.length} objectives covered)
             </span>
           </h2>
           {dom.description ? (
@@ -92,6 +100,16 @@ export default async function CurriculumPage({
                 <Link href={`/t/${tenantSlug}/curriculum/${obj.id}`}>
                   <strong>{obj.code}</strong> {obj.title}
                 </Link>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "var(--text-sm)",
+                    color: "var(--disabled-text)",
+                  }}
+                >
+                  {coverage.get(obj.id) ?? 0} evidence item
+                  {(coverage.get(obj.id) ?? 0) === 1 ? "" : "s"} mapped
+                </span>
               </li>
             ))}
           </ul>

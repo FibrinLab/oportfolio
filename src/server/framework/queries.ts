@@ -22,7 +22,7 @@ import { canReadCurriculum, type EnrolmentContext } from "@/server/policy/policy
 export async function loadEnrolmentContext(
   tenantId: string,
   enrolmentId: string,
-): Promise<EnrolmentContext | null> {
+): Promise<(EnrolmentContext & { frameworkReleaseId: string | null }) | null> {
   const db = getDb();
   const rows = await db
     .select({

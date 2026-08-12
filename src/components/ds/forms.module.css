@@ -1,0 +1,124 @@
+.label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--disabled-text);
+  margin-bottom: var(--space-2);
+  max-width: var(--measure);
+}
+
+.input {
+  display: block;
+  width: 100%;
+  min-height: var(--target-min);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-control);
+  padding: 0 var(--space-3);
+  background: var(--paper);
+  font-family: var(--font-body);
+}
+
+.textarea {
+  composes: input;
+  padding: var(--space-2) var(--space-3);
+  min-height: 96px;
+  line-height: var(--leading-body);
+}
+
+.select {
+  composes: input;
+  appearance: auto;
+}
+
+.field {
+  margin-bottom: var(--space-4);
+}
+
+.error {
+  font-weight: 700;
+  margin: var(--space-2) 0;
+}
+
+.buttonPrimary {
+  min-height: var(--target-min);
+  padding: 0 var(--space-5);
+  background: var(--ink);
+  color: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-control);
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.buttonSecondary {
+  min-height: var(--target-min);
+  padding: 0 var(--space-5);
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-control);
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.buttonTertiary {
+  min-height: var(--target-min);
+  padding: 0 var(--space-2);
+  background: none;
+  border: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-family: var(--font-mono);
+}
+
+.buttonPrimary:disabled,
+.buttonSecondary:disabled {
+  color: var(--disabled-text);
+  border-color: var(--rule);
+  background: var(--paper-muted);
+  cursor: not-allowed;
+}
+
+.checkboxRow {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  min-height: var(--target-min);
+  padding: var(--space-2) 0;
+}
+
+.checkboxRow input[type="checkbox"],
+.checkboxRow input[type="radio"] {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--ink);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notice {
+  border-left: 4px solid var(--ink);
+  background: var(--paper-soft);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  max-width: var(--measure);
+}
+
+.noticeTitle {
+  font-weight: 700;
+}
