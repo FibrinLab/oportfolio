@@ -1,0 +1,165 @@
+/* Base styles — reset, typography, focus, selection, reduced motion.
+   spec/10-design-system.md and spec/11-accessibility.md. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+/* Focus: pure black can disappear against black controls, so use a double
+   ring — white inner outline, black outer shadow (inverted on light controls
+   via .on-paper contexts handled per component). */
+:focus-visible {
+  outline: 3px solid var(--paper);
+  outline-offset: 0;
+  box-shadow: 0 0 0 6px var(--ink);
+}
+
+/* On plain paper backgrounds the inverse reads better: black outline, then
+   white gap provided by the offset. Components on dark fills keep the default. */
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[data-focus="on-paper"]:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+
+h1 {
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+}
+
+h2 {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+}
+
+h3 {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+p,
+li {
+  font-family: var(--font-body);
+  max-width: var(--measure);
+  overflow-wrap: break-word;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-thickness: 2.5px;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Uppercase is reserved for short labels/stamps */
+.stamp {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: -100px;
+  background: var(--paper);
+  border: var(--border-strong);
+  padding: var(--space-2) var(--space-4);
+  z-index: 100;
+}
+
+.skip-link:focus {
+  top: var(--space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

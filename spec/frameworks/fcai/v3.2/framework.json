@@ -1,0 +1,526 @@
+{
+  "schemaVersion": "1.0.0",
+  "framework": {
+    "namespace": "fcai",
+    "title": "NHS Fellowship in Clinical AI Curriculum",
+    "publisher": "Guy's and St Thomas' NHS Foundation Trust Clinical Scientific Computing",
+    "description": "Educational framework for NHS frontline workers to develop clinical AI expertise alongside clinical roles.",
+    "canonicalUrl": "https://gstt-csc.github.io/assets/docs/FCAI_Curriculum_v3.2.pdf"
+  },
+  "release": {
+    "version": "3.2",
+    "label": "Version 3.2 (Cohort 3)",
+    "publicationYear": 2024,
+    "effectiveFrom": null,
+    "sourceUrl": "https://gstt-csc.github.io/assets/docs/FCAI_Curriculum_v3.2.pdf",
+    "sourceDocumentLabel": "Clinical AI Curriculum v3.2 (Cohort 3, 2024)",
+    "status": "verified_source",
+    "locale": "en-GB",
+    "verificationNote": "Public source and content verified on 12 August 2026. Faculty must confirm the canonical release for Cohort 5 or later before assignment.",
+    "releaseNotes": "Initial oPortfolio package. Published cross-mappings remain at domain level; no objective-level equivalence is asserted."
+  },
+  "deliveryMethods": [
+    {
+      "stableId": "fcai.delivery.immersive_project",
+      "code": "DM-01",
+      "title": "Immersive clinical AI project",
+      "description": "Supervised experiential project work in a live NHS clinical AI team, potentially including publication or research.",
+      "sortOrder": 1
+    },
+    {
+      "stableId": "fcai.delivery.workshop",
+      "code": "DM-02",
+      "title": "Small group workshops",
+      "description": "Monthly interactive expert-led masterclasses that complement and extend other learning.",
+      "sortOrder": 2
+    },
+    {
+      "stableId": "fcai.delivery.e_learning",
+      "code": "DM-03",
+      "title": "E-learning",
+      "description": "Didactic and self-paced modules, exercises, assignments and deadlines through programme-selected learning resources.",
+      "sortOrder": 3
+    },
+    {
+      "stableId": "fcai.delivery.networking",
+      "code": "DM-04",
+      "title": "Networking",
+      "description": "Mentorship, peer learning, site visits, alumni events and pastoral faculty sessions.",
+      "sortOrder": 4
+    }
+  ],
+  "duties": [
+    {
+      "stableId": "fcai.duty.mdt",
+      "code": "DU-01",
+      "title": "Work in an agile multidisciplinary team",
+      "description": "Work as a member of an agile multidisciplinary team including AI specialists, medical physicists, IT, health economists and clinicians.",
+      "sortOrder": 1
+    },
+    {
+      "stableId": "fcai.duty.stakeholders",
+      "code": "DU-02",
+      "title": "Communicate with clinical AI stakeholders",
+      "description": "Communicate with hospital management, patients, clinicians, regulators and technology developers.",
+      "sortOrder": 2
+    },
+    {
+      "stableId": "fcai.duty.datasets",
+      "code": "DU-03",
+      "title": "Curate clinical datasets lawfully",
+      "description": "Curate clinical datasets in accordance with data-protection law and regulation.",
+      "sortOrder": 3
+    },
+    {
+      "stableId": "fcai.duty.safe_deployment",
+      "code": "DU-04",
+      "title": "Deploy clinical AI safely",
+      "description": "Deploy clinical AI in a safe, legal, equitable and effective way.",
+      "sortOrder": 4
+    },
+    {
+      "stableId": "fcai.duty.evaluate_workflows",
+      "code": "DU-05",
+      "title": "Evaluate clinical AI in workflows",
+      "description": "Critically evaluate the performance of clinical AI in hospital workflows.",
+      "sortOrder": 5
+    },
+    {
+      "stableId": "fcai.duty.present_findings",
+      "code": "DU-06",
+      "title": "Present scientific findings",
+      "description": "Present scientific findings in clinical AI including clinical trials and quality-improvement projects.",
+      "sortOrder": 6
+    },
+    {
+      "stableId": "fcai.duty.policy_standards",
+      "code": "DU-07",
+      "title": "Develop policy and standards",
+      "description": "Understand and develop policies and standards for clinical AI regulation.",
+      "sortOrder": 7
+    }
+  ],
+  "domains": [
+    {
+      "stableId": "fcai.fundamentals",
+      "code": "AF",
+      "title": "AI Fundamentals",
+      "description": "Algorithms, data, tools, training, optimisation, metrics and validation foundations.",
+      "sortOrder": 1,
+      "deliveryMethodRefs": [
+        "fcai.delivery.e_learning",
+        "fcai.delivery.immersive_project",
+        "fcai.delivery.workshop"
+      ],
+      "objectives": [
+        {
+          "stableId": "fcai.fundamentals.algorithms",
+          "code": "AF-01",
+          "title": "Select and apply AI algorithms",
+          "sourceText": "Understand and apply different types of AI algorithms for different tasks, including logistic regression, decision trees, support vector machines, random forest, K-means clustering, neural networks and Bayesian approaches.",
+          "sortOrder": 1
+        },
+        {
+          "stableId": "fcai.fundamentals.data_provenance",
+          "code": "AF-02",
+          "title": "Understand training-data provenance, quality and structure",
+          "sourceText": "Understand data provenance, quality and structure requirements for training AI algorithms, including synthetic data, metadata, taxonomies, ontologies and standards.",
+          "sortOrder": 2
+        },
+        {
+          "stableId": "fcai.fundamentals.data_wrangling",
+          "code": "AF-03",
+          "title": "Perform data extraction and wrangling",
+          "sourceText": "Perform data extraction and wrangling, including feature labelling and extraction, dimensionality reduction and normalisation.",
+          "sortOrder": 3
+        },
+        {
+          "stableId": "fcai.fundamentals.training_types",
+          "code": "AF-04",
+          "title": "Understand AI training types",
+          "sourceText": "Understand types of training for AI algorithms, including supervised, unsupervised, reinforcement, ensemble, distributed and federated learning.",
+          "sortOrder": 4
+        },
+        {
+          "stableId": "fcai.fundamentals.languages_frameworks",
+          "code": "AF-05",
+          "title": "Use AI languages and frameworks",
+          "sourceText": "Understand types of languages and frameworks used to create and analyse AI algorithms, including Python, R and SQL.",
+          "sortOrder": 5
+        },
+        {
+          "stableId": "fcai.fundamentals.optimisation",
+          "code": "AF-06",
+          "title": "Train and optimise algorithms",
+          "sourceText": "Understand and apply AI algorithm training and optimisation, including hyperparameter tuning, internal validation and optimal stopping.",
+          "sortOrder": 6
+        },
+        {
+          "stableId": "fcai.fundamentals.metrics",
+          "code": "AF-07",
+          "title": "Apply algorithm performance metrics",
+          "sourceText": "Understand and apply common AI algorithm performance metrics, including precision, recall, F1 score and Receiver Operator Characteristic.",
+          "sortOrder": 7
+        },
+        {
+          "stableId": "fcai.fundamentals.validation_methods",
+          "code": "AF-08",
+          "title": "Understand validation methods",
+          "sourceText": "Understand AI algorithm validation methods, including hold-out and cross-validation.",
+          "sortOrder": 8
+        }
+      ]
+    },
+    {
+      "stableId": "fcai.regulation",
+      "code": "RS",
+      "title": "Regulation & Standards",
+      "description": "Medical-device regulation, data protection, clinical risk, research governance and law.",
+      "sortOrder": 2,
+      "deliveryMethodRefs": [
+        "fcai.delivery.immersive_project",
+        "fcai.delivery.workshop"
+      ],
+      "objectives": [
+        {
+          "stableId": "fcai.regulation.device_marking",
+          "code": "RS-01",
+          "title": "Understand medical-device marking and certification",
+          "sourceText": "Understand CE and UKCA marking and methods for obtaining certification for different classes of medical device for AI technology.",
+          "sortOrder": 1
+        },
+        {
+          "stableId": "fcai.regulation.gdpr",
+          "code": "RS-02",
+          "title": "Apply GDPR to AI technology",
+          "sourceText": "Understand and apply GDPR to AI technology.",
+          "sortOrder": 2
+        },
+        {
+          "stableId": "fcai.regulation.clinical_risk",
+          "code": "RS-03",
+          "title": "Apply clinical risk-management standards",
+          "sourceText": "Understand and apply NHS clinical risk-management standards to AI technology, including DCB0129 and DCB0160.",
+          "sortOrder": 3
+        },
+        {
+          "stableId": "fcai.regulation.research_governance",
+          "code": "RS-04",
+          "title": "Apply research and service-evaluation governance",
+          "sourceText": "Understand and apply HRA definitions of clinical research and service evaluation to AI evaluation and implementation, following the appropriate governance for each.",
+          "sortOrder": 4
+        },
+        {
+          "stableId": "fcai.regulation.legal_frameworks",
+          "code": "RS-05",
+          "title": "Understand AI clinical decision-making law",
+          "sourceText": "Understand legal frameworks applying to AI technology in clinical decision making, including negligence, product liability and consent.",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "stableId": "fcai.validation",
+      "code": "VE",
+      "title": "Validation & Evaluation",
+      "description": "Evidence appraisal, local validation, monitoring, incidents, error and bias.",
+      "sortOrder": 3,
+      "deliveryMethodRefs": [
+        "fcai.delivery.immersive_project",
+        "fcai.delivery.workshop",
+        "fcai.delivery.e_learning"
+      ],
+      "objectives": [
+        {
+          "stableId": "fcai.validation.literature",
+          "code": "VE-01",
+          "title": "Critically appraise AI literature",
+          "sourceText": "Critically appraise published literature relating to AI algorithms using established evidence standards where appropriate, including the NICE evidence standards framework.",
+          "sortOrder": 1
+        },
+        {
+          "stableId": "fcai.validation.local_validation",
+          "code": "VE-02",
+          "title": "Understand local model validation",
+          "sourceText": "Understand local AI model validation, including prospective clinical studies and guidance such as SPIRIT-AI and CONSORT-AI.",
+          "sortOrder": 2
+        },
+        {
+          "stableId": "fcai.validation.monitoring",
+          "code": "VE-03",
+          "title": "Manage post-deployment monitoring and incidents",
+          "sourceText": "Establish and manage post-deployment monitoring, evaluation and iteration of AI technology, including detecting, reporting and managing adverse effects or serious incidents related to AI.",
+          "sortOrder": 3
+        },
+        {
+          "stableId": "fcai.validation.bias",
+          "code": "VE-04",
+          "title": "Measure and mitigate error and bias",
+          "sourceText": "Understand, measure and mitigate potential sources of error and bias in AI algorithms, including circumstances leading to inequitable distributions of patient outcomes and medical algorithmic audit methodology.",
+          "sortOrder": 4
+        }
+      ]
+    },
+    {
+      "stableId": "fcai.integration",
+      "code": "IS",
+      "title": "Integration & Systems Impact",
+      "description": "Technical integration, workflow, impact, human factors, failure, explainability and procurement.",
+      "sortOrder": 4,
+      "deliveryMethodRefs": [
+        "fcai.delivery.immersive_project",
+        "fcai.delivery.workshop",
+        "fcai.delivery.e_learning"
+      ],
+      "objectives": [
+        {
+          "stableId": "fcai.integration.health_it",
+          "code": "IS-01",
+          "title": "Integrate AI with healthcare IT",
+          "sourceText": "Integrate AI technology with existing healthcare IT systems.",
+          "sortOrder": 1
+        },
+        {
+          "stableId": "fcai.integration.workflow_design",
+          "code": "IS-02",
+          "title": "Design clinical workflows for AI",
+          "sourceText": "Design and redesign clinical workflows to integrate AI technology, applying interoperability and user-centred design principles.",
+          "sortOrder": 2
+        },
+        {
+          "stableId": "fcai.integration.impact",
+          "code": "IS-03",
+          "title": "Evaluate systems impact",
+          "sourceText": "Evaluate AI impact in health-economic measures, service efficiency, patient outcomes, workforce and environment.",
+          "sortOrder": 3
+        },
+        {
+          "stableId": "fcai.integration.cognitive_bias",
+          "code": "IS-04",
+          "title": "Understand cognitive biases in AI interaction",
+          "sourceText": "Understand how interactions with AI may be affected by automation, aversion, confirmation and rejection biases and alert fatigue.",
+          "sortOrder": 4
+        },
+        {
+          "stableId": "fcai.integration.failure_modes",
+          "code": "IS-05",
+          "title": "Understand and respond to AI failure modes",
+          "sourceText": "Understand AI failure modes, how they differ from human clinical-reasoning errors, including outlier detection and adversarial attacks, and how to respond.",
+          "sortOrder": 5
+        },
+        {
+          "stableId": "fcai.integration.explainability",
+          "code": "IS-06",
+          "title": "Understand AI explainability",
+          "sourceText": "Understand the principles and limitations of AI explainability.",
+          "sortOrder": 6
+        },
+        {
+          "stableId": "fcai.integration.procurement",
+          "code": "IS-07",
+          "title": "Understand healthcare AI procurement",
+          "sourceText": "Understand principles and guidelines for AI technology procurement in healthcare.",
+          "sortOrder": 7
+        }
+      ]
+    },
+    {
+      "stableId": "fcai.strategy",
+      "code": "SC",
+      "title": "Strategy & Culture",
+      "description": "Teams, partnership, transformation, leadership, workforce learning and public co-design.",
+      "sortOrder": 5,
+      "deliveryMethodRefs": [
+        "fcai.delivery.immersive_project",
+        "fcai.delivery.workshop",
+        "fcai.delivery.networking"
+      ],
+      "objectives": [
+        {
+          "stableId": "fcai.strategy.mdt",
+          "code": "SC-01",
+          "title": "Develop multidisciplinary teams",
+          "sourceText": "Participate in and develop multidisciplinary teams for the creation and deployment of AI technology.",
+          "sortOrder": 1
+        },
+        {
+          "stableId": "fcai.strategy.academia_industry",
+          "code": "SC-02",
+          "title": "Collaborate with academia and industry",
+          "sourceText": "Collaborate effectively with colleagues in academia and industry.",
+          "sortOrder": 2
+        },
+        {
+          "stableId": "fcai.strategy.change_management",
+          "code": "SC-03",
+          "title": "Apply transformation and change management",
+          "sourceText": "Understand and apply digital transformation and effective change-management principles.",
+          "sortOrder": 3
+        },
+        {
+          "stableId": "fcai.strategy.leadership",
+          "code": "SC-04",
+          "title": "Build leadership support and champions",
+          "sourceText": "Establish leadership buy-in and support internal champions for change for AI technology.",
+          "sortOrder": 4
+        },
+        {
+          "stableId": "fcai.strategy.workforce_learning",
+          "code": "SC-05",
+          "title": "Understand NHS workforce learning needs",
+          "sourceText": "Understand the learning and development needs of NHS staff for AI technology.",
+          "sortOrder": 5
+        },
+        {
+          "stableId": "fcai.strategy.public_codesign",
+          "code": "SC-06",
+          "title": "Co-design ethical and accessible AI with patients and public",
+          "sourceText": "Understand the needs and expectations of patients and public for ethical and accessible AI through co-design principles.",
+          "sortOrder": 6
+        }
+      ]
+    }
+  ],
+  "externalFrameworks": [
+    {
+      "namespace": "hee.digital_literacies.2018",
+      "title": "A Health and Care Digital Capabilities Framework",
+      "publisher": "Health Education England",
+      "version": "2018",
+      "mappingAvailability": "published_domain_level",
+      "notes": "Nodes and FCAI domain mappings are transcribed from Table 1 of FCAI v3.2.",
+      "nodes": [
+        {"stableId": "hee.1c", "code": "1c", "title": "Work collaboratively with others using digital technologies and tools"},
+        {"stableId": "hee.1d", "code": "1d", "title": "Participate actively in and across digital networks"},
+        {"stableId": "hee.2a", "code": "2a", "title": "Use digital technologies and tools for personal learning and professional development"},
+        {"stableId": "hee.2b", "code": "2b", "title": "Use digital technologies and tools in teaching, coaching and mentoring"},
+        {"stableId": "hee.3a", "code": "3a", "title": "Find, manage, organise, store and share digital information, data and content"},
+        {"stableId": "hee.3b", "code": "3b", "title": "Act on guidelines, protocols, regulations and safeguards for information and data"},
+        {"stableId": "hee.3c", "code": "3c", "title": "Critically analyse, evaluate and interpret information, data, content and sources"},
+        {"stableId": "hee.3d", "code": "3d", "title": "Understand and adhere to digital copyright, intellectual property and privacy rules and regulations"},
+        {"stableId": "hee.4a", "code": "4a", "title": "Create new digital resources and curate existing resources collaboratively"},
+        {"stableId": "hee.4b", "code": "4b", "title": "Use digital tools in research, quality improvement, audit and scholarly activities"},
+        {"stableId": "hee.4c", "code": "4c", "title": "Use digital technologies to support new ideas, methods, solutions and decisions"},
+        {"stableId": "hee.4d", "code": "4d", "title": "Act as a digital champion or change agent"},
+        {"stableId": "hee.4e", "code": "4e", "title": "Lead and champion effective digital technologies in research and scholarship"},
+        {"stableId": "hee.5c", "code": "5c", "title": "Resolve technical challenges and problems individually and with others"},
+        {"stableId": "hee.5d", "code": "5d", "title": "Use technical knowledge to solve problems and achieve expected outputs"},
+        {"stableId": "hee.6a", "code": "6a", "title": "Develop and safeguard digital identities and reputation"}
+      ]
+    },
+    {
+      "namespace": "fci.core.2020",
+      "title": "Core Competency Framework",
+      "publisher": "Faculty of Clinical Informatics",
+      "version": "2020",
+      "sourceUrl": "https://www.bcs.org/media/tfblc4ny/fcicorecompetencyframeworkreport.pdf",
+      "mappingAvailability": "published_domain_level",
+      "notes": "Nodes and FCAI domain mappings are transcribed from Table 1 of FCAI v3.2.",
+      "nodes": [
+        {"stableId": "fci.1_2", "code": "1.2", "title": "Clinical Governance"},
+        {"stableId": "fci.1_3", "code": "1.3", "title": "Models of Care Delivery"},
+        {"stableId": "fci.1_4", "code": "1.4", "title": "Health Administration and Services"},
+        {"stableId": "fci.1_5", "code": "1.5", "title": "Informatics Strategies"},
+        {"stableId": "fci.1_6", "code": "1.6", "title": "Informatics in Health"},
+        {"stableId": "fci.1_7", "code": "1.7", "title": "Scientific and Research Skills"},
+        {"stableId": "fci.2_2", "code": "2.2", "title": "Working and Communicating with Project Stakeholders"},
+        {"stableId": "fci.2_3", "code": "2.3", "title": "Selecting and Procuring Information Systems and/or Technology"},
+        {"stableId": "fci.2_4", "code": "2.4", "title": "Interoperability and Integration"},
+        {"stableId": "fci.2_5", "code": "2.5", "title": "System Architecture"},
+        {"stableId": "fci.2_6", "code": "2.6", "title": "Data Security and Cyber Security"},
+        {"stableId": "fci.2_7", "code": "2.7", "title": "Maintenance and Support for Healthcare Information Systems"},
+        {"stableId": "fci.2_8", "code": "2.8", "title": "Evaluation of Information Systems"},
+        {"stableId": "fci.3_1", "code": "3.1", "title": "Analytical Methodologies and Applications"},
+        {"stableId": "fci.3_2", "code": "3.2", "title": "Data Sources and Characteristics"},
+        {"stableId": "fci.3_3", "code": "3.3", "title": "Data Structure, Standards and Linkage"},
+        {"stableId": "fci.3_4", "code": "3.4", "title": "Data Management"},
+        {"stableId": "fci.3_5", "code": "3.5", "title": "Information Governance, Accessibility and Ethics"},
+        {"stableId": "fci.3_6", "code": "3.6", "title": "Data Visualisation"},
+        {"stableId": "fci.4_1", "code": "4.1", "title": "Quality Improvement and Clinical Safety"},
+        {"stableId": "fci.4_2", "code": "4.2", "title": "Change Management"},
+        {"stableId": "fci.4_3", "code": "4.3", "title": "Behaviour Change"},
+        {"stableId": "fci.4_4", "code": "4.4", "title": "Usability and Design"},
+        {"stableId": "fci.4_5", "code": "4.5", "title": "Patient Involvement and Engagement"},
+        {"stableId": "fci.4_6", "code": "4.6", "title": "Evaluation"},
+        {"stableId": "fci.5_1", "code": "5.1", "title": "Evidence-based Practice"},
+        {"stableId": "fci.5_3", "code": "5.3", "title": "Clinical Decision Making and Support"},
+        {"stableId": "fci.6_1", "code": "6.1", "title": "Multi-disciplinary and Organisational Working"},
+        {"stableId": "fci.6_4", "code": "6.4", "title": "Project Leadership"},
+        {"stableId": "fci.6_5", "code": "6.5", "title": "Informatics Strategy and Innovation"},
+        {"stableId": "fci.6_6", "code": "6.6", "title": "Planning"}
+      ]
+    },
+    {
+      "namespace": "nhs_ai_lab.confidence.2022",
+      "title": "Developing Healthcare Workers' Confidence in AI",
+      "publisher": "NHS AI Lab and Health Education England",
+      "version": "2022",
+      "mappingAvailability": "alignment_named_no_node_map",
+      "notes": "FCAI v3.2 names this framework as an alignment/source for learning content but does not publish a node-level mapping in Table 1.",
+      "nodes": []
+    },
+    {
+      "namespace": "nhs_digital_transformation.ai_dht.2023",
+      "title": "Artificial Intelligence and Digital Healthcare Technologies Capability Framework",
+      "publisher": "NHS Digital Transformation",
+      "version": "2023",
+      "mappingAvailability": "alignment_named_no_node_map",
+      "notes": "FCAI v3.2 names this framework as an alignment/source for learning content but does not publish a node-level mapping in Table 1.",
+      "nodes": []
+    }
+  ],
+  "crossMappings": [
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.2a","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.3a","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.4c","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.3_1","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.3_2","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.3_3","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.3_4","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.fundamentals","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.3_6","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+
+    {"sourceLevel":"domain","sourceStableId":"fcai.regulation","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.3b","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.regulation","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.3d","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.regulation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.1_2","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.regulation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.2_3","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.regulation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.2_6","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.regulation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.3_5","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.3c","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.4a","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.4b","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.4e","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.1_7","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.2_7","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.2_8","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.4_1","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.4_6","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.5_1","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.validation","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.6_4","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.3d","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.5c","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.5d","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.1_3","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.1_4","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.1_5","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.1_6","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.2_4","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.2_5","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.4_4","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.integration","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.5_3","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.1c","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.1d","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.2b","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.4d","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"hee.digital_literacies.2018","targetNodeStableId":"hee.6a","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.2_2","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.4_2","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.4_3","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.4_5","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.6_1","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.6_5","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."},
+    {"sourceLevel":"domain","sourceStableId":"fcai.strategy","targetFrameworkNamespace":"fci.core.2020","targetNodeStableId":"fci.6_6","relationship":"related","provenance":"published","verificationStatus":"verified_against_source","citation":"FCAI v3.2, Table 1, pages 7–8."}
+  ]
+}

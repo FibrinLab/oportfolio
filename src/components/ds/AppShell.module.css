@@ -1,0 +1,116 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.rail {
+  width: var(--rail-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--rule);
+  padding: var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  font-weight: 700;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: var(--space-4);
+}
+
+.context {
+  font-size: var(--text-sm);
+  color: var(--disabled-text);
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  min-height: var(--target-min);
+  padding: 0 var(--space-4);
+  text-decoration: none;
+  border-left: 4px solid transparent;
+}
+
+.navLink:hover {
+  text-decoration: underline;
+}
+
+.navLinkActive {
+  border-left-color: var(--ink);
+  font-weight: 700;
+}
+
+.railFooter {
+  margin-top: auto;
+  padding: var(--space-3) var(--space-4) 0;
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-6) var(--gutter);
+  max-width: calc(var(--content-max) + 2 * var(--gutter));
+}
+
+/* Mobile: top bar + disclosure menu, single column (spec/09). */
+@media (max-width: 767px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .rail {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    padding: 0;
+  }
+
+  .brand {
+    margin-bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: var(--target-min);
+  }
+
+  .menuToggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--target-min);
+    min-width: var(--target-min);
+    padding: 0 var(--space-3);
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-control);
+    font-weight: 700;
+  }
+
+  .main {
+    padding: var(--space-4) var(--gutter);
+  }
+
+  .context {
+    padding-top: var(--space-2);
+  }
+
+  /* Menu is a disclosure on mobile. */
+  .nav[data-open="false"] {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .menuToggle {
+    display: none;
+  }
+}

@@ -1,0 +1,52 @@
+/* Print — spec/10: A4 first, black on white, navigation hidden,
+   no orphan headings, legible on monochrome printers. */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 11pt;
+  }
+
+  nav,
+  [data-print="hide"],
+  .skip-link {
+    display: none !important;
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  /* Print URLs for important external links */
+  a[data-external]::after {
+    content: " (" attr(href) ")";
+    word-break: break-all;
+    font-size: 9pt;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  blockquote,
+  figure {
+    break-inside: avoid;
+  }
+}

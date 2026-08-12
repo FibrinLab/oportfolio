@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oportfolio.example/schemas/framework.schema.json",
+  "title": "oPortfolio framework package",
+  "description": "Portable, versioned curriculum/framework definition. Strings are plain text or safe source URLs; packages must not contain executable content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "framework",
+    "release",
+    "domains",
+    "deliveryMethods",
+    "duties",
+    "externalFrameworks",
+    "crossMappings"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "framework": {
+      "$ref": "#/$defs/framework"
+    },
+    "release": {
+      "$ref": "#/$defs/release"
+    },
+    "domains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/domain"
+      }
+    },
+    "deliveryMethods": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/taxonomyItem"
+      }
+    },
+    "duties": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/taxonomyItem"
+      }
+    },
+    "externalFrameworks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/externalFramework"
+      }
+    },
+    "crossMappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/crossMapping"
+      }
+    }
+  },
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 160
+    },
+    "plainText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 10000,
+      "not": {
+        "pattern": "<\\s*(script|iframe|object|embed|style)\\b"
+      }
+    },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "title", "publisher", "description"],
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/stableId"
+        },
+        "title": {
+          "$ref": "#/$defs/plainText"
+        },
+        "publisher": {
+          "$ref": "#/$defs/plainText"
+        },
+        "description": {
+          "$ref": "#/$defs/plainText"
+        },
+        "canonicalUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "label",
+        "publicationYear",
+        "sourceUrl",
+        "sourceDocumentLabel",
+        "status",
+        "verificationNote"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+(?:\\.[0-9]+){1,2}(?:[-+][A-Za-z0-9.-]+)?$"
+        },
+        "label": {
+          "$ref": "#/$defs/plainText"
+        },
+        "publicationYear": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2200
+        },
+        "effectiveFrom": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "sourceDocumentLabel": {
+          "$ref": "#/$defs/plainText"
+        },
+        "status": {
+          "enum": ["draft", "verified_source", "published", "superseded", "retired"]
+        },
+        "locale": {
+          "type": "string",
+          "default": "en-GB"
+        },
+        "verificationNote": {
+          "$ref": "#/$defs/plainText"
+        },
+        "releaseNotes": {
+          "$ref": "#/$defs/plainText"
+        }
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableId", "code", "title", "sourceText", "sortOrder"],
+      "properties": {
+        "stableId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}-[0-9]{2}$"
+        },
+        "title": {
+          "$ref": "#/$defs/plainText"
+        },
+        "sourceText": {
+          "$ref": "#/$defs/plainText"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableId", "code", "title", "sortOrder", "deliveryMethodRefs", "objectives"],
+      "properties": {
+        "stableId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "title": {
+          "$ref": "#/$defs/plainText"
+        },
+        "description": {
+          "$ref": "#/$defs/plainText"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "deliveryMethodRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "objectives": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/objective"
+          }
+        }
+      }
+    },
+    "taxonomyItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableId", "code", "title", "description", "sortOrder"],
+      "properties": {
+        "stableId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 30
+        },
+        "title": {
+          "$ref": "#/$defs/plainText"
+        },
+        "description": {
+          "$ref": "#/$defs/plainText"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "externalNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableId", "code", "title"],
+      "properties": {
+        "stableId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "title": {
+          "$ref": "#/$defs/plainText"
+        },
+        "parentStableId": {
+          "$ref": "#/$defs/stableId"
+        }
+      }
+    },
+    "externalFramework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "title", "publisher", "version", "mappingAvailability", "nodes"],
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/stableId"
+        },
+        "title": {
+          "$ref": "#/$defs/plainText"
+        },
+        "publisher": {
+          "$ref": "#/$defs/plainText"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "mappingAvailability": {
+          "enum": ["published_domain_level", "published_objective_level", "alignment_named_no_node_map"]
+        },
+        "notes": {
+          "$ref": "#/$defs/plainText"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/externalNode"
+          }
+        }
+      }
+    },
+    "crossMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceLevel",
+        "sourceStableId",
+        "targetFrameworkNamespace",
+        "targetNodeStableId",
+        "relationship",
+        "provenance",
+        "verificationStatus",
+        "citation"
+      ],
+      "properties": {
+        "sourceLevel": {
+          "enum": ["domain", "objective"]
+        },
+        "sourceStableId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "targetFrameworkNamespace": {
+          "$ref": "#/$defs/stableId"
+        },
+        "targetNodeStableId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "relationship": {
+          "enum": ["exact", "broader", "narrower", "related"]
+        },
+        "provenance": {
+          "enum": ["published", "faculty_authored", "imported"]
+        },
+        "verificationStatus": {
+          "enum": ["verified_against_source", "unverified", "deprecated"]
+        },
+        "citation": {
+          "$ref": "#/$defs/plainText"
+        }
+      }
+    }
+  }
+}
