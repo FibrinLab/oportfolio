@@ -48,7 +48,7 @@ describe("validateNarrativeDoc", () => {
   it("rejects javascript: links", () => {
     const result = validateNarrativeDoc({
       type: "doc",
-      // eslint-disable-next-line no-script-url
+       
       content: [paragraph("click", [{ type: "link", attrs: { href: "javascript:alert(1)" } }])],
     });
     expect(result.valid).toBe(false);

@@ -1,29 +1,12 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { acceptInvitationRequest } from "@/server/http/apiSchemas";
 import { getDb } from "@/server/db/client";
 import { acceptInvitation } from "@/server/identity/invitations";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/server/identity/sessions";
 import { problem } from "@/server/http/problem";
 import { withApi } from "@/server/http/withApi";
 
-const bodySchema = z.object({
-  token: z.string().min(20).max(200),
-  preferredName: z.string().min(1).max(160),
-  professionalGroup: z.string().max(160).optional(),
-  homeSpecialtyOrRole: z.string().max(160).optional(),
-  organisation: z.string().max(160).optional(),
-  // Required notices confirmed during onboarding (spec/04 §1).
-  acknowledgedNotices: z
-    .array(
-      z.object({
-        noticeType: z.enum(["privacy_notice", "acceptable_use", "no_patient_data"]),
-        noticeVersion: z.string().max(40),
-      }),
-    )
-    .min(3),
-});
-
-export const POST = withApi({ bodySchema, public: true }, async ({ body, requestId }) => {
+export const POST = withApi({ bodySchema: acceptInvitationRequest, public: true }, async ({ body, requestId }) => {
   const required = new Set(["privacy_notice", "acceptable_use", "no_patient_data"]);
   const provided = new Set(body.acknowledgedNotices.map((n) => n.noticeType));
   for (const notice of required) {

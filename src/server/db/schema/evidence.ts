@@ -17,7 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { mutableColumns } from "./common";
 import { appUser, tenant } from "./identity";
-import { duty, enrolment, programme } from "./programme";
+import { duty, enrolment } from "./programme";
 import { objective } from "./framework";
 
 export const visibility = pgEnum("visibility", ["private", "supervisors", "faculty"]);

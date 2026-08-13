@@ -43,7 +43,11 @@ export function useAutosave<TDraft>(options: {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingRef = useRef(false);
   const saveRef = useRef(options.save);
-  saveRef.current = options.save;
+  // Latest-callback pattern, synced outside render for compiler safety.
+  useEffect(() => {
+    saveRef.current = options.save;
+  }, [options.save]);
+  const flushRef = useRef<() => Promise<void>>(async () => {});
 
   const flush = useCallback(async () => {
     if (savingRef.current) return;
@@ -65,7 +69,7 @@ export function useAutosave<TDraft>(options: {
       }
       setState({ kind: "saved", at: new Date() });
       // A change may have arrived while saving.
-      if (draftRef.current !== null) void flush();
+      if (draftRef.current !== null) void flushRef.current();
       return;
     }
 
@@ -86,6 +90,10 @@ export function useAutosave<TDraft>(options: {
     }
     setState({ kind: "error", message: result.message ?? "Could not save" });
   }, [options.storageKey]);
+
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
 
   const markDirty = useCallback(
     (draft: TDraft) => {

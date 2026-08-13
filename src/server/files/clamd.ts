@@ -82,7 +82,7 @@ export async function scanStream(stream: Readable): Promise<ScanResult> {
 function readAll(socket: net.Socket): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    socket.on("data", (data) => {
+    socket.on("data", (data: Buffer) => {
       chunks.push(data);
       // clamd terminates replies with \0 in z-mode.
       if (data.includes(0)) {

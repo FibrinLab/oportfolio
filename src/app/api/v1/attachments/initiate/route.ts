@@ -1,21 +1,12 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { initiateUploadRequest } from "@/server/http/apiSchemas";
 import { getEvidenceWithAccess } from "@/server/portfolio/evidence";
 import { initiateUpload } from "@/server/files/attachments";
 import { notFoundProblem, problem } from "@/server/http/problem";
 import { withApi } from "@/server/http/withApi";
 import { resolveTenantForApi } from "@/server/http/tenant";
 
-const bodySchema = z.object({
-  evidenceId: z.string().uuid(),
-  filename: z.string().min(1).max(255),
-  mediaTypeClaimed: z.string().min(3).max(120),
-  sizeBytes: z.number().int().positive(),
-  // Required for every upload session (FR-FI-005).
-  patientDataConfirmed: z.literal(true),
-});
-
-export const POST = withApi({ bodySchema }, async ({ actor, body, request, requestId }) => {
+export const POST = withApi({ bodySchema: initiateUploadRequest }, async ({ actor, body, request, requestId }) => {
   const tenantId = await resolveTenantForApi(actor, request);
   if (!tenantId) return notFoundProblem(requestId);
   const access = await getEvidenceWithAccess(actor, tenantId, body.evidenceId);

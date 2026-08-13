@@ -12,6 +12,8 @@ export async function withIdempotency(
   request: NextRequest,
   tenantId: string,
   requestId: string,
+  // The zod-parsed body — the raw stream was already consumed by withApi.
+  parsedBody: unknown,
   execute: () => Promise<NextResponse>,
 ): Promise<NextResponse> {
   const key = request.headers.get("idempotency-key");
@@ -22,11 +24,10 @@ export async function withIdempotency(
   }
 
   const db = getDb();
-  const bodyText = await request
-    .clone()
-    .text()
-    .catch(() => "");
-  const requestHash = createHash("sha256").update(request.method).update(bodyText).digest("hex");
+  const requestHash = createHash("sha256")
+    .update(request.method)
+    .update(JSON.stringify(parsedBody ?? null))
+    .digest("hex");
 
   const existing = await db.execute(sql`
     SELECT request_hash, response_status, response_body

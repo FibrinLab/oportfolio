@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { uuidv7 } from "uuidv7";
-import { z } from "zod";
+import { createInvitationRequest } from "@/server/http/apiSchemas";
 import { getDb } from "@/server/db/client";
 import { cohort, enrolment, supervisorAssignment } from "@/server/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -11,19 +11,7 @@ import { problem, notFoundProblem } from "@/server/http/problem";
 import { withApi } from "@/server/http/withApi";
 import { withIdempotency } from "@/server/http/idempotency";
 
-const bodySchema = z.object({
-  tenantId: z.string().uuid(),
-  email: z.string().email().max(320),
-  displayName: z.string().min(1).max(160),
-  role: z.enum(["fellow", "supervisor", "faculty"]),
-  // Fellow invitations create a provisional enrolment (FR-ID-003).
-  cohortId: z.string().uuid().optional(),
-  primarySupervisorUserId: z.string().uuid().optional(),
-  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});
-
-export const POST = withApi({ bodySchema }, async ({ actor, body, request, requestId }) => {
+export const POST = withApi({ bodySchema: createInvitationRequest }, async ({ actor, body, request, requestId }) => {
   const decision = canInvite(actor, body.tenantId);
   if (!decision.allow) return notFoundProblem(requestId);
 
@@ -33,7 +21,7 @@ export const POST = withApi({ bodySchema }, async ({ actor, body, request, reque
     });
   }
 
-  return withIdempotency(request, body.tenantId, requestId, async () => {
+  return withIdempotency(request, body.tenantId, requestId, body, async () => {
     const db = getDb();
     const result = await db.transaction(async (tx) => {
       let enrolmentId: string | null = null;

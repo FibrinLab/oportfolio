@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { conflictBackupRequest } from "@/server/http/apiSchemas";
 import {
   createConflictBackup,
   getEvidenceWithAccess,
@@ -9,12 +9,7 @@ import { notFoundProblem } from "@/server/http/problem";
 import { withApi } from "@/server/http/withApi";
 import { resolveTenantForApi } from "@/server/http/tenant";
 
-const backupSchema = z.object({
-  // The losing tab's unsaved body, preserved verbatim as a revision (AC-04).
-  snapshot: z.record(z.string(), z.unknown()),
-});
-
-export const POST = withApi({ bodySchema: backupSchema }, async ({ actor, body, params, request, requestId }) => {
+export const POST = withApi({ bodySchema: conflictBackupRequest }, async ({ actor, body, params, request, requestId }) => {
   const tenantId = await resolveTenantForApi(actor, request);
   if (!tenantId) return notFoundProblem(requestId);
   const access = await getEvidenceWithAccess(actor, tenantId, params.evidenceId!);

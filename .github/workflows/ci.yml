@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  DATABASE_URL: postgres://oportfolio:oportfolio_dev@localhost:5432/oportfolio
+  APP_BASE_URL: http://localhost:3000
+
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -19,8 +23,12 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - name: OpenAPI drift check
+        run: |
+          pnpm openapi:generate
+          git diff --exit-code docs/openapi.json
 
-  integration:
+  stack:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,21 +38,33 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Start services
-        run: docker compose up -d postgres minio minio-init mailpit
-      - name: Wait for Postgres
-        run: until docker compose exec -T postgres pg_isready -U oportfolio; do sleep 1; done
-      - name: Migrate (forward-apply on empty database)
-        run: pnpm db:migrate
-        env:
-          DATABASE_URL: postgres://oportfolio:oportfolio_dev@localhost:5432/oportfolio
+      - name: Start services (ClamAV excluded — scan pipeline is covered locally)
+        run: docker compose up -d --wait postgres minio minio-init mailpit
+      - name: Migrate, import framework, seed
+        run: |
+          pnpm db:migrate
+          pnpm framework:import spec/frameworks/fcai/v3.2/framework.json --publish
+          pnpm seed
       - run: pnpm test:integration
-        env:
-          DATABASE_URL: postgres://oportfolio:oportfolio_dev@localhost:5432/oportfolio
+      - name: Build and start app + worker
+        run: |
+          cp .env.example .env
+          pnpm build
+          nohup pnpm start > app.log 2>&1 &
+          nohup pnpm worker > worker.log 2>&1 &
+          until curl -sf http://localhost:3000/sign-in > /dev/null; do sleep 1; done
       - run: pnpm test:authz
-        env:
-          DATABASE_URL: postgres://oportfolio:oportfolio_dev@localhost:5432/oportfolio
-      - name: Verify audit chain
-        run: pnpm verify:audit-chain
-        env:
-          DATABASE_URL: postgres://oportfolio:oportfolio_dev@localhost:5432/oportfolio
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - run: pnpm verify:audit-chain
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: |
+            test-results/
+            app.log
+            worker.log
+          retention-days: 7

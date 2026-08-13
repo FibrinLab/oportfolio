@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { domain, noticeAcknowledgement, objective } from "@/server/db/schema";
 import { getActor, resolveTenant } from "@/server/policy/actor";
@@ -14,6 +14,8 @@ import {
 } from "@/server/portfolio/evidence";
 import { getEditorContext } from "@/server/portfolio/editorData";
 import { renderNarrativeHtml } from "@/server/portfolio/narrativeDoc";
+import { listAttachments } from "@/server/files/attachments";
+import { listLinks } from "@/server/portfolio/links";
 import { EvidenceEditor } from "@/components/evidence/EvidenceEditor";
 import { formatDateUk, formatDateTimeUk } from "@/lib/dates";
 
@@ -46,7 +48,7 @@ export default async function EvidencePage({
   if (editable) {
     const context = await getEditorContext(actor, tenantContext.tenantId);
     if (!context) notFound();
-    const [objectiveIds, dutyIds, priorReflectionAck] = await Promise.all([
+    const [objectiveIds, dutyIds, priorReflectionAck, files, links] = await Promise.all([
       getActiveObjectiveIds(evidence.id),
       getActiveDutyIds(evidence.id),
       getDb()
@@ -60,6 +62,8 @@ export default async function EvidencePage({
           ),
         )
         .limit(1),
+      listAttachments(evidence.id, tenantContext.tenantId),
+      listLinks(evidence.id, tenantContext.tenantId),
     ]);
     return (
       <EvidenceEditor
@@ -83,6 +87,8 @@ export default async function EvidencePage({
         pickerObjectives={context.pickerObjectives}
         frameworkLabel={context.frameworkLabel}
         reflectionAcknowledgedBefore={priorReflectionAck.length > 0}
+        initialFiles={files}
+        initialLinks={links}
       />
     );
   }
@@ -105,6 +111,11 @@ export default async function EvidencePage({
     : [];
   const revisions = await listRevisions(actor, access);
   const narrativeHtml = renderNarrativeHtml(evidence.narrativeDoc);
+  const [files, links] = await Promise.all([
+    listAttachments(evidence.id, tenantContext.tenantId),
+    listLinks(evidence.id, tenantContext.tenantId),
+  ]);
+  const cleanFiles = files.filter((f) => f.scanStatus === "clean");
 
   return (
     <article style={{ maxWidth: "var(--measure)" }}>
@@ -151,6 +162,39 @@ export default async function EvidencePage({
         <p style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)", marginTop: "var(--space-2)" }}>
           Mapped evidence is a count and review aid, not proof of competence.
         </p>
+      </section>
+
+      <section aria-labelledby="artefacts-heading" style={{ marginBottom: "var(--space-6)" }}>
+        <h2 id="artefacts-heading" style={{ marginBottom: "var(--space-2)" }}>
+          Artefacts
+        </h2>
+        {cleanFiles.length === 0 && links.length === 0 ? (
+          <p style={{ color: "var(--disabled-text)" }}>No files or links.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {cleanFiles.map((file) => (
+              <li key={file.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--space-2) 0" }}>
+                <a href={`/api/v1/attachments/${file.id}/download?tenant=${tenantSlug}`}>
+                  {file.displayName}
+                </a>{" "}
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
+                  ({Math.max(1, Math.round(file.sizeBytes / 1024))} KB)
+                </span>
+              </li>
+            ))}
+            {links.map((link) => (
+              <li key={link.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--space-2) 0" }}>
+                <a href={link.url} target="_blank" rel="noopener noreferrer" data-external>
+                  {link.label ?? link.host} <span aria-hidden>[↗]</span>
+                  <span className="visually-hidden">(opens external site)</span>
+                </a>{" "}
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
+                  ({link.host})
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section aria-labelledby="history-heading">

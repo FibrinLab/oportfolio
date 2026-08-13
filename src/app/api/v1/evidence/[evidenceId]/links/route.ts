@@ -1,21 +1,12 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { addLinkRequest, removeLinkRequest } from "@/server/http/apiSchemas";
 import { getEvidenceWithAccess } from "@/server/portfolio/evidence";
 import { addLink, listLinks, removeLink } from "@/server/portfolio/links";
 import { notFoundProblem, problem } from "@/server/http/problem";
 import { withApi } from "@/server/http/withApi";
 import { resolveTenantForApi } from "@/server/http/tenant";
 
-const addSchema = z.object({
-  url: z.string().min(9).max(2000),
-  label: z.string().max(160).optional(),
-  linkType: z
-    .enum(["general", "repository", "commit", "pull_request", "release", "notebook", "other"])
-    .optional(),
-  description: z.string().max(1000).optional(),
-});
-
-export const POST = withApi({ bodySchema: addSchema }, async ({ actor, body, params, request, requestId }) => {
+export const POST = withApi({ bodySchema: addLinkRequest }, async ({ actor, body, params, request, requestId }) => {
   const tenantId = await resolveTenantForApi(actor, request);
   if (!tenantId) return notFoundProblem(requestId);
   const access = await getEvidenceWithAccess(actor, tenantId, params.evidenceId!);
@@ -29,9 +20,7 @@ export const POST = withApi({ bodySchema: addSchema }, async ({ actor, body, par
   return NextResponse.json(result, { status: 201 });
 });
 
-const deleteSchema = z.object({ linkId: z.string().uuid() });
-
-export const DELETE = withApi({ bodySchema: deleteSchema }, async ({ actor, body, params, request, requestId }) => {
+export const DELETE = withApi({ bodySchema: removeLinkRequest }, async ({ actor, body, params, request, requestId }) => {
   const tenantId = await resolveTenantForApi(actor, request);
   if (!tenantId) return notFoundProblem(requestId);
   const access = await getEvidenceWithAccess(actor, tenantId, params.evidenceId!);

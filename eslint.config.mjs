@@ -1,12 +1,25 @@
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig } from "eslint/config";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 
-const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
-
-const config = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+export default defineConfig([
   {
-    ignores: [".next/**", "node_modules/**", "playwright-report/**", "test-results/**"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "playwright-report/**",
+      "test-results/**",
+      "db/migrations/**",
+    ],
   },
-];
-
-export default config;
+  ...nextCoreWebVitals,
+  ...nextTypescript,
+  {
+    rules: {
+      // Compiler-alignment rule that also flags assignments to browser
+      // globals (document.cookie, location) inside event handlers — those
+      // are intentional here.
+      "react-hooks/immutability": "off",
+    },
+  },
+]);

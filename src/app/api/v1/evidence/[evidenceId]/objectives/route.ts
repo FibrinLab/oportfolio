@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { setObjectivesRequest } from "@/server/http/apiSchemas";
 import { getEvidenceWithAccess, setObjectives } from "@/server/portfolio/evidence";
 import { notFoundProblem, problem } from "@/server/http/problem";
 import { withApi } from "@/server/http/withApi";
 import { resolveTenantForApi } from "@/server/http/tenant";
 
-const bodySchema = z.object({
-  objectiveIds: z.array(z.string().uuid()).max(50),
-});
-
-export const PUT = withApi({ bodySchema }, async ({ actor, body, params, request, requestId }) => {
+export const PUT = withApi({ bodySchema: setObjectivesRequest }, async ({ actor, body, params, request, requestId }) => {
   const tenantId = await resolveTenantForApi(actor, request);
   if (!tenantId) return notFoundProblem(requestId);
   const access = await getEvidenceWithAccess(actor, tenantId, params.evidenceId!);

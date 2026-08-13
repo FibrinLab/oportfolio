@@ -22,6 +22,13 @@
       "when": 1786550388722,
       "tag": "0002_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786550388723,
+      "tag": "0003_fix_release_immutability_trigger",
+      "breakpoints": true
     }
   ]
 }

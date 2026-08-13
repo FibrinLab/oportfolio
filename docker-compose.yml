@@ -49,7 +49,7 @@ services:
       "
 
   clamav:
-    image: clamav/clamav:latest
+    image: clamav/clamav-debian:latest
     ports:
       - "3310:3310"
     volumes:

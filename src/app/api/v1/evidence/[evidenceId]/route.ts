@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { patchEvidenceRequest } from "@/server/http/apiSchemas";
 import {
   getActiveDutyIds,
   getActiveObjectiveIds,
@@ -11,17 +11,6 @@ import { notFoundProblem, problem } from "@/server/http/problem";
 import { withApi } from "@/server/http/withApi";
 import { resolveTenantForApi } from "@/server/http/tenant";
 import { canEditEvidence } from "@/server/policy/policy";
-
-const patchSchema = z.object({
-  title: z.string().min(1).max(160).optional(),
-  activityDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  activityEndedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  evidenceTypeId: z.string().uuid().optional(),
-  narrativeDoc: z.unknown().optional(),
-  typeFieldsJson: z.record(z.string(), z.unknown()).nullable().optional(),
-  provenanceId: z.string().uuid().nullable().optional(),
-  explicitSave: z.boolean().optional(),
-});
 
 export const GET = withApi({}, async ({ actor, params, request, requestId }) => {
   const tenantId = await resolveTenantForApi(actor, request);
@@ -61,11 +50,17 @@ export const GET = withApi({}, async ({ actor, params, request, requestId }) => 
   );
 });
 
-export const PATCH = withApi({ bodySchema: patchSchema }, async ({ actor, body, params, request, requestId }) => {
+export const PATCH = withApi({ bodySchema: patchEvidenceRequest }, async ({ actor, body, params, request, requestId }) => {
   const tenantId = await resolveTenantForApi(actor, request);
   if (!tenantId) return notFoundProblem(requestId);
   const access = await getEvidenceWithAccess(actor, tenantId, params.evidenceId!);
   if (!access || !access.decision.allow) return notFoundProblem(requestId);
+
+  // Authorization before protocol errors: a reader without edit rights gets
+  // the uniform 404, never a 428 hinting the item is editable.
+  if (!canEditEvidence(actor, access.evidence, access.enrolment).allow) {
+    return notFoundProblem(requestId);
+  }
 
   const ifMatch = request.headers.get("if-match");
   const rowVersion = ifMatch ? Number(ifMatch.replaceAll('"', "")) : NaN;

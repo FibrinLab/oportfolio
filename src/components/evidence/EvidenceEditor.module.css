@@ -1,0 +1,14 @@
+.editorGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+/* Context column sits beside the document only when there is room; at 400%
+   zoom / narrow widths everything stacks in one column (spec/11: no
+   two-dimensional scrolling). */
+@media (min-width: 900px) {
+  .editorGrid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}

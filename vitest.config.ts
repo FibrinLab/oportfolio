@@ -25,8 +25,7 @@ export default defineConfig({
           environment: "node",
           // Real Postgres/MinIO/clamd via docker compose; run serially so
           // transactions and seeds don't interleave.
-          pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
+          fileParallelism: false,
           testTimeout: 30000,
           hookTimeout: 60000,
         },
@@ -37,8 +36,7 @@ export default defineConfig({
           name: "authz",
           include: ["tests/authz/**/*.test.ts"],
           environment: "node",
-          pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
+          fileParallelism: false,
           testTimeout: 30000,
           hookTimeout: 120000,
         },

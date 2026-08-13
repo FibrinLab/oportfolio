@@ -99,7 +99,7 @@ const SUPPORTED_SCHEMA_VERSIONS = new Set(["1.0.0"]);
 
 // No active content anywhere in package strings (spec/07).
 const ACTIVE_CONTENT = /<\s*[a-z!/]|javascript:|on\w+\s*=/i;
-// eslint-disable-next-line no-control-regex
+ 
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
 
 let compiledSchema: ReturnType<Ajv2020["compile"]> | null = null;

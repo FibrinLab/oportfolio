@@ -2,10 +2,12 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/apiClient";
 import { useAutosave } from "@/lib/useAutosave";
 import forms from "@/components/ds/forms.module.css";
+import styles from "./EvidenceEditor.module.css";
+import { FilesAndLinks } from "./FilesAndLinks";
 import { ObjectivePicker, type PickerObjective } from "./ObjectivePicker";
 import { SaveStatus } from "./SaveStatus";
 import {
@@ -65,6 +67,8 @@ export function EvidenceEditor({
   pickerObjectives,
   frameworkLabel,
   reflectionAcknowledgedBefore,
+  initialFiles = [],
+  initialLinks = [],
 }: {
   tenantSlug: string;
   enrolmentId: string;
@@ -73,6 +77,8 @@ export function EvidenceEditor({
   pickerObjectives: PickerObjective[];
   frameworkLabel: string;
   reflectionAcknowledgedBefore: boolean;
+  initialFiles?: Array<{ id: string; displayName: string; sizeBytes: number; scanStatus: string }>;
+  initialLinks?: Array<{ id: string; url: string; host: string; label: string | null }>;
 }) {
   const [evidenceId, setEvidenceId] = useState(initial.id);
   const [title, setTitle] = useState(initial.title);
@@ -89,26 +95,37 @@ export function EvidenceEditor({
   const narrativeRef = useRef<unknown>(initial.narrativeDoc);
   const evidenceIdRef = useRef(initial.id);
   const objectiveIdsRef = useRef(initial.objectiveIds);
-  objectiveIdsRef.current = objectiveIds;
   const dutyIdsRef = useRef(initial.dutyIds);
-  dutyIdsRef.current = dutyIds;
+  useEffect(() => {
+    objectiveIdsRef.current = objectiveIds;
+    dutyIdsRef.current = dutyIds;
+  }, [objectiveIds, dutyIds]);
 
   const selectedType = options.types.find((t) => t.id === evidenceTypeId);
   const typeCode = selectedType?.stableCode ?? "learning_record";
   const isReflection = typeCode === "reflection";
   const extraFields = TYPE_FIELDS[typeCode] ?? [];
 
-  const buildDraft = useCallback((): DraftPayload => {
+  // Latest-fields ref: touch() runs inside change handlers where the state
+  // setters have not re-rendered yet, so reading state through a closure
+  // would send stale values. Handlers pass their fresh value as an override;
+  // the ref carries everything else from the last committed render.
+  const fieldsRef = useRef({ title, activityDate, evidenceTypeId, provenanceId, typeFields });
+  useEffect(() => {
+    fieldsRef.current = { title, activityDate, evidenceTypeId, provenanceId, typeFields };
+  }, [title, activityDate, evidenceTypeId, provenanceId, typeFields]);
+
+  const buildDraft = useCallback((overrides?: Partial<typeof fieldsRef.current>): DraftPayload => {
+    const current = { ...fieldsRef.current, ...overrides };
     return {
-      title,
-      activityDate: activityDate || null,
-      evidenceTypeId,
+      title: current.title,
+      activityDate: current.activityDate || null,
+      evidenceTypeId: current.evidenceTypeId,
       narrativeDoc: narrativeRef.current,
-      typeFieldsJson: Object.keys(typeFields).length ? typeFields : null,
-      provenanceId: provenanceId || null,
+      typeFieldsJson: Object.keys(current.typeFields).length ? current.typeFields : null,
+      provenanceId: current.provenanceId || null,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, activityDate, evidenceTypeId, typeFields, provenanceId]);
+  }, []);
 
   const save = useCallback(
     async (draft: DraftPayload, rowVersion: number) => {
@@ -191,8 +208,9 @@ export function EvidenceEditor({
       );
       if (result.ok) return { ok: true as const, rowVersion: result.data.rowVersion };
       if (result.problem.status === 412) {
-        // Preserve this tab's words server-side before showing the choice (AC-04).
-        void api(`/api/v1/evidence/${evidenceIdRef.current}/revisions`, {
+        // Preserve this tab's words server-side BEFORE showing the choice —
+        // the conflict panel promises they are recoverable (AC-04).
+        await api(`/api/v1/evidence/${evidenceIdRef.current}/revisions`, {
           method: "POST",
           tenantSlug,
           body: { snapshot: draft as unknown as Record<string, unknown> },
@@ -218,9 +236,12 @@ export function EvidenceEditor({
     save,
   });
 
-  const touch = useCallback(() => {
-    autosave.markDirty(buildDraft());
-  }, [autosave, buildDraft]);
+  const touch = useCallback(
+    (overrides?: Partial<typeof fieldsRef.current>) => {
+      autosave.markDirty(buildDraft(overrides));
+    },
+    [autosave, buildDraft],
+  );
 
   async function syncObjectives(next: string[]) {
     setObjectiveIds(next);
@@ -319,7 +340,7 @@ export function EvidenceEditor({
         </div>
       ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: "var(--space-6)" }} data-editor-grid>
+      <div className={styles.editorGrid}>
         <div>
           <div className={forms.field}>
             <label htmlFor="ev-title" className={forms.label}>
@@ -333,8 +354,8 @@ export function EvidenceEditor({
               maxLength={160}
               onChange={(event) => {
                 setTitle(event.target.value);
+                touch({ title: event.target.value });
               }}
-              onInput={touch}
             />
           </div>
 
@@ -350,8 +371,8 @@ export function EvidenceEditor({
                 value={activityDate}
                 onChange={(event) => {
                   setActivityDate(event.target.value);
+                  touch({ activityDate: event.target.value });
                 }}
-                onInput={touch}
               />
             </div>
             <div className={forms.field} style={{ flex: 1, minWidth: 220 }}>
@@ -364,7 +385,7 @@ export function EvidenceEditor({
                 value={evidenceTypeId}
                 onChange={(event) => {
                   setEvidenceTypeId(event.target.value);
-                  touch();
+                  touch({ evidenceTypeId: event.target.value });
                 }}
               >
                 {options.types.map((type) => (
@@ -432,8 +453,9 @@ export function EvidenceEditor({
                       className={forms.select}
                       value={String(typeFields[field.key] ?? "")}
                       onChange={(event) => {
-                        setTypeFields((current) => ({ ...current, [field.key]: event.target.value }));
-                        touch();
+                        const next = { ...fieldsRef.current.typeFields, [field.key]: event.target.value };
+                        setTypeFields(next);
+                        touch({ typeFields: next });
                       }}
                     >
                       <option value="">Choose…</option>
@@ -450,9 +472,10 @@ export function EvidenceEditor({
                       className={forms.input}
                       value={String(typeFields[field.key] ?? "")}
                       onChange={(event) => {
-                        setTypeFields((current) => ({ ...current, [field.key]: event.target.value }));
+                        const next = { ...fieldsRef.current.typeFields, [field.key]: event.target.value };
+                        setTypeFields(next);
+                        touch({ typeFields: next });
                       }}
-                      onInput={touch}
                     />
                   )}
                 </div>
@@ -472,7 +495,7 @@ export function EvidenceEditor({
               value={provenanceId}
               onChange={(event) => {
                 setProvenanceId(event.target.value);
-                touch();
+                touch({ provenanceId: event.target.value });
               }}
             >
               <option value="">Choose…</option>
@@ -520,6 +543,17 @@ export function EvidenceEditor({
               </label>
             ))}
           </fieldset>
+
+          {evidenceId ? (
+            <FilesAndLinks
+              tenantSlug={tenantSlug}
+              evidenceId={evidenceId}
+              initialFiles={initialFiles}
+              initialLinks={initialLinks}
+            />
+          ) : (
+            <p className={forms.hint}>Files and links can be added once the draft is created.</p>
+          )}
 
           <div className={forms.notice}>
             <p className={forms.noticeTitle}>PRIVACY</p>
