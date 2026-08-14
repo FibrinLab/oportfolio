@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { DemoSignIn } from "./DemoSignIn";
 import { SignInForm } from "./SignInForm";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 export default function SignInPage() {
+  const demoMode = process.env.DEMO_LOGIN === "true";
   return (
     <main
       style={{
@@ -17,6 +19,7 @@ export default function SignInPage() {
         Learning portfolio for the NHS Fellowship in Clinical AI.
       </p>
       <SignInForm />
+      {demoMode ? <DemoSignIn /> : null}
       <p
         style={{
           marginTop: "var(--space-6)",

@@ -52,7 +52,8 @@ describe("authorization matrix", () => {
     if (surface.public) {
       it(`${surface.id}: public surface responds without a session`, async () => {
         const result = await call(surface, "unauth");
-        expect([200, 307, 308, 422].includes(result.status)).toBe(true);
+        // 404 covers env-gated public surfaces (demo sign-in) when disabled.
+        expect([200, 307, 308, 404, 422].includes(result.status)).toBe(true);
       });
       continue;
     }

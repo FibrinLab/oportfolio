@@ -81,6 +81,18 @@ export const SURFACES: Surface[] = [
     public: true,
   },
   {
+    id: "auth.demo",
+    routeFile: "src/app/api/v1/auth/demo/route.ts",
+    kind: "api",
+    method: "POST",
+    path: () => "/api/v1/auth/demo",
+    // Fixture personas are not @example.org seed accounts, so this responds
+    // 404 (gate closed or address rejected) / 422 in every configuration.
+    body: () => ({ email: "matrix-probe@not-a-demo-domain.example" }),
+    allowed: [],
+    public: true,
+  },
+  {
     id: "invitations.accept",
     routeFile: "src/app/api/v1/invitations/accept/route.ts",
     kind: "api",
