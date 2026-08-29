@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getActor, resolveTenant } from "@/server/policy/actor";
 import { getFellowContext } from "@/server/tenancy/fellowContext";
-import { formatDateUk } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Today" };
 
@@ -27,7 +27,7 @@ export default async function TodayPage({
 
       {fellow ? (
         <section
-          aria-labelledby="programme-heading"
+          aria-labelledby="diary-heading"
           style={{
             border: "1px solid var(--rule)",
             padding: "var(--space-4)",
@@ -35,43 +35,37 @@ export default async function TodayPage({
             maxWidth: "var(--measure)",
           }}
         >
-          <h2 id="programme-heading" style={{ borderBottom: "2px solid var(--ink)", paddingBottom: "var(--space-2)", marginBottom: "var(--space-3)" }}>
-            Your programme
+          <h2 id="diary-heading" style={{ borderBottom: "2px solid var(--ink)", paddingBottom: "var(--space-2)", marginBottom: "var(--space-3)" }}>
+            Your private log
           </h2>
-          <dl
+          <p style={{ marginBottom: "var(--space-4)" }}>
+            Add a short note, a longer reflection, or a useful link. There is no programme
+            approval workflow—this space is for your own record.
+          </p>
+          <Link
+            href={`/t/${tenantSlug}/log/new`}
             style={{
-              display: "grid",
-              gridTemplateColumns: "max-content 1fr",
-              gap: "var(--space-2) var(--space-4)",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: "var(--target-min)",
+              padding: "0 var(--space-5)",
+              background: "var(--ink)",
+              color: "var(--paper)",
+              border: "2px solid var(--ink)",
+              borderRadius: "var(--radius-control)",
+              fontWeight: 700,
+              textDecoration: "none",
             }}
           >
-            <dt style={{ fontWeight: 700 }}>Programme</dt>
-            <dd>
-              {fellow.programmeName}
-              {fellow.cohortName ? ` — ${fellow.cohortName}` : ""}
-            </dd>
-            {fellow.startsOn ? (
-              <>
-                <dt style={{ fontWeight: 700 }}>Dates</dt>
-                <dd>
-                  {formatDateUk(fellow.startsOn)}
-                  {fellow.endsOn ? ` to ${formatDateUk(fellow.endsOn)}` : ""}
-                </dd>
-              </>
-            ) : null}
-            <dt style={{ fontWeight: 700 }}>Supervisor</dt>
-            <dd>{fellow.supervisorNames.length ? fellow.supervisorNames.join(", ") : "Not yet assigned"}</dd>
-            <dt style={{ fontWeight: 700 }}>Curriculum</dt>
-            <dd>
-              {fellow.frameworkTitle
-                ? `${fellow.frameworkTitle} — version ${fellow.frameworkVersion}`
-                : "Pinned curriculum will appear once published"}
-            </dd>
-          </dl>
+            New entry
+          </Link>
+          <p style={{ marginTop: "var(--space-4)", fontSize: "var(--text-sm)" }}>
+            Only you can read your entries, dates, links, and files within oPortfolio.
+          </p>
         </section>
       ) : (
         <p style={{ maxWidth: "var(--measure)" }}>
-          You do not have an active programme enrolment in this tenant.
+          Your diary is not available in this workspace.
         </p>
       )}
     </>

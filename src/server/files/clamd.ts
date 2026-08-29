@@ -1,5 +1,6 @@
 import net from "node:net";
 import type { Readable } from "node:stream";
+import { getEnv } from "@/server/config/env";
 
 // Minimal clamd INSTREAM client (spec plan: hand-rolled, ~50 lines).
 // Protocol: send "zINSTREAM\0", then length-prefixed chunks (4-byte BE),
@@ -19,8 +20,8 @@ function connect(): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
     const socket = net.connect(
       {
-        host: process.env.CLAMD_HOST ?? "localhost",
-        port: Number(process.env.CLAMD_PORT ?? 3310),
+        host: getEnv().CLAMD_HOST,
+        port: getEnv().CLAMD_PORT,
       },
       () => resolve(socket),
     );

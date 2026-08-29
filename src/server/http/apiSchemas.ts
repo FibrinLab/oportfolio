@@ -38,7 +38,7 @@ export const createInvitationRequest = z.object({
 export const createEvidenceRequest = z.object({
   title: z.string().min(1).max(160),
   activityDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
-  evidenceTypeId: z.string().uuid(),
+  evidenceTypeId: z.string().uuid().nullable().optional(),
   narrativeDoc: z.unknown().optional(),
   reflectionAcknowledged: z.boolean().optional(),
 });
@@ -46,17 +46,9 @@ export const createEvidenceRequest = z.object({
 export const patchEvidenceRequest = z.object({
   title: z.string().min(1).max(160).optional(),
   activityDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  activityEndedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  evidenceTypeId: z.string().uuid().optional(),
+  evidenceTypeId: z.string().uuid().nullable().optional(),
   narrativeDoc: z.unknown().optional(),
-  typeFieldsJson: z.record(z.string(), z.unknown()).nullable().optional(),
-  provenanceId: z.string().uuid().nullable().optional(),
   explicitSave: z.boolean().optional(),
-});
-
-export const shareEvidenceRequest = z.object({
-  visibility: z.enum(["private", "supervisors", "faculty"]),
-  audienceConfirmed: z.literal(true),
 });
 
 export const conflictBackupRequest = z.object({
@@ -65,10 +57,6 @@ export const conflictBackupRequest = z.object({
 
 export const setObjectivesRequest = z.object({
   objectiveIds: z.array(z.string().uuid()).max(50),
-});
-
-export const setDutiesRequest = z.object({
-  dutyIds: z.array(z.string().uuid()).max(20),
 });
 
 export const addLinkRequest = z.object({
@@ -83,9 +71,29 @@ export const addLinkRequest = z.object({
 export const removeLinkRequest = z.object({ linkId: z.string().uuid() });
 
 export const initiateUploadRequest = z.object({
-  evidenceId: z.string().uuid(),
+  entryId: z.string().uuid(),
   filename: z.string().min(1).max(255),
   mediaTypeClaimed: z.string().min(3).max(120),
   sizeBytes: z.number().int().positive(),
   patientDataConfirmed: z.literal(true),
+});
+
+export const exportDiaryRequest = z.object({
+  enrolmentId: z.string().uuid(),
+});
+
+export const finishDiaryRequest = z.object({
+  confirmation: z.literal("FINISH MY DIARY"),
+});
+
+export const reopenDiaryRequest = z.object({
+  confirmation: z.literal("REOPEN MY DIARY"),
+});
+
+export const placeRetentionHoldRequest = z.object({
+  reason: z.string().trim().min(10).max(500),
+});
+
+export const releaseRetentionHoldRequest = z.object({
+  confirmation: z.literal("RELEASE HOLD"),
 });

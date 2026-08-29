@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { AppShell, type NavItem } from "@/components/ds/AppShell";
+import { getOwnEnrolment } from "@/server/framework/queries";
 import { getActor, resolveTenant } from "@/server/policy/actor";
 
 // Every authenticated page lives under this layout: session required, tenant
@@ -27,20 +28,22 @@ export default async function ShellLayout({
   const base = `/t/${tenantSlug}`;
   const navItems: NavItem[] = [];
   if (roles.has("fellow")) {
+    const ownEnrolment = await getOwnEnrolment(actor, tenantContext.tenantId);
     navItems.push(
       { href: `${base}/today`, label: "Today" },
-      { href: `${base}/log`, label: "Log" },
-      { href: `${base}/curriculum`, label: "Curriculum" },
+      { href: `${base}/log`, label: "Diary" },
+      { href: `${base}/diary-export`, label: "Export" },
     );
-  }
-  if (roles.has("supervisor")) {
-    navItems.push({ href: `${base}/supervisor/fellows`, label: "Fellows" });
+    if (ownEnrolment?.frameworkReleaseId) {
+      navItems.splice(2, 0, { href: `${base}/curriculum`, label: "Curriculum" });
+    }
   }
   if (roles.has("faculty") || roles.has("tenant_admin")) {
     navItems.push({ href: `${base}/faculty/people`, label: "People" });
   }
 
   const roleLabel = [...roles]
+    .filter((role) => role !== "fellow")
     .map((role) =>
       role === "tenant_admin" ? "Tenant admin" : role.charAt(0).toUpperCase() + role.slice(1),
     )

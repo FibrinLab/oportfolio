@@ -3,7 +3,9 @@
 export function SignOutButton() {
   async function onSignOut() {
     await fetch("/api/v1/auth/sign-out", { method: "POST" });
-    window.location.assign("/sign-in");
+    // Full navigation (not the client router) so no server-component cache
+    // from the signed-in session survives.
+    window.location.href = new URL("/sign-in", window.location.origin).href;
   }
 
   return (

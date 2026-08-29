@@ -78,20 +78,20 @@ const document = {
     title: "oPortfolio API",
     version: "0.1.0",
     description:
-      "Milestone 1 surface. Browser clients use same-site secure sessions with CSRF origin checks; every endpoint resolves the tenant from authenticated membership before object authorization (default deny).",
+      "Private personal diary surface. A verified email creates its own isolated diary; entries, links, files, revisions and exports are readable only by their author.",
   },
   servers: [{ url: "/", description: "Same-origin" }],
   paths: {
     "/api/v1/auth/magic-link": {
       post: {
-        summary: "Request a sign-in link (uniform response; rate limited)",
+        summary: "Request an access link for sign-up or sign-in (uniform response; rate limited)",
         requestBody: body(schemas.magicLinkRequest),
         responses: { "200": ok },
       },
     },
     "/api/v1/auth/verify": {
       post: {
-        summary: "Consume a magic-link token and start a session",
+        summary: "Verify the email, create a private diary when needed, and start a session",
         requestBody: body(schemas.verifyRequest),
         responses: { "200": ok, "422": problemResponse },
       },
@@ -102,37 +102,22 @@ const document = {
     "/api/v1/me": {
       get: { summary: "Current user and memberships", responses: { "200": ok, "401": problemResponse } },
     },
-    "/api/v1/invitations": {
-      post: {
-        summary: "Create an invitation (faculty/tenant admin); fellow invitations create a provisional enrolment",
-        parameters: [idempotencyHeader],
-        requestBody: body(schemas.createInvitationRequest),
-        responses: { "201": created, "404": uniform404 },
-      },
-    },
-    "/api/v1/invitations/accept": {
-      post: {
-        summary: "Accept an invitation: create the account, memberships and session",
-        requestBody: body(schemas.acceptInvitationRequest),
-        responses: { "200": ok, "422": problemResponse },
-      },
-    },
-    "/api/v1/enrolments/{enrolmentId}/evidence": {
+    "/api/v1/enrolments/{enrolmentId}/diary-entries": {
       get: {
-        summary: "List evidence visible to the caller (visibility-filtered before materialisation)",
+        summary: "List the fellow's current and archived private diary entries",
         parameters: [uuidParam("enrolmentId"), tenantHeader],
         responses: { "200": ok, "404": uniform404 },
       },
       post: {
-        summary: "Create a private draft evidence item",
+        summary: "Create a private diary entry",
         parameters: [uuidParam("enrolmentId"), tenantHeader, idempotencyHeader],
         requestBody: body(schemas.createEvidenceRequest),
         responses: { "201": created, "404": uniform404, "422": problemResponse },
       },
     },
-    "/api/v1/evidence/{evidenceId}": {
+    "/api/v1/diary-entries/{evidenceId}": {
       get: {
-        summary: "Read an evidence item (ETag carries the row version)",
+        summary: "Read the owner's private diary entry (ETag carries the row version)",
         parameters: [uuidParam("evidenceId"), tenantHeader],
         responses: { "200": ok, "404": uniform404 },
       },
@@ -153,29 +138,21 @@ const document = {
         responses: { "200": ok, "404": uniform404 },
       },
     },
-    "/api/v1/evidence/{evidenceId}/share": {
-      post: {
-        summary: "Change the audience after an explicit preview (audited)",
-        parameters: [uuidParam("evidenceId"), tenantHeader, idempotencyHeader],
-        requestBody: body(schemas.shareEvidenceRequest),
-        responses: { "200": ok, "404": uniform404, "409": problemResponse },
-      },
-    },
-    "/api/v1/evidence/{evidenceId}/archive": {
+    "/api/v1/diary-entries/{evidenceId}/archive": {
       post: {
         summary: "Archive the item",
         parameters: [uuidParam("evidenceId"), tenantHeader],
         responses: { "200": ok, "404": uniform404 },
       },
     },
-    "/api/v1/evidence/{evidenceId}/restore": {
+    "/api/v1/diary-entries/{evidenceId}/restore": {
       post: {
         summary: "Restore an archived or grace-period-deleted item",
         parameters: [uuidParam("evidenceId"), tenantHeader],
         responses: { "200": ok, "404": uniform404 },
       },
     },
-    "/api/v1/evidence/{evidenceId}/revisions": {
+    "/api/v1/diary-entries/{evidenceId}/revisions": {
       get: {
         summary: "Append-only revision history",
         parameters: [uuidParam("evidenceId"), tenantHeader],
@@ -188,7 +165,7 @@ const document = {
         responses: { "201": created, "404": uniform404 },
       },
     },
-    "/api/v1/evidence/{evidenceId}/objectives": {
+    "/api/v1/diary-entries/{evidenceId}/objectives": {
       put: {
         summary: "Replace active objective mappings (pinned-release enforced)",
         parameters: [uuidParam("evidenceId"), tenantHeader],
@@ -196,15 +173,7 @@ const document = {
         responses: { "200": ok, "404": uniform404, "422": problemResponse },
       },
     },
-    "/api/v1/evidence/{evidenceId}/duties": {
-      put: {
-        summary: "Replace duty tags",
-        parameters: [uuidParam("evidenceId"), tenantHeader],
-        requestBody: body(schemas.setDutiesRequest),
-        responses: { "200": ok, "404": uniform404 },
-      },
-    },
-    "/api/v1/evidence/{evidenceId}/links": {
+    "/api/v1/diary-entries/{evidenceId}/links": {
       get: {
         summary: "List external links",
         parameters: [uuidParam("evidenceId"), tenantHeader],
@@ -223,7 +192,7 @@ const document = {
         responses: { "200": ok, "404": uniform404 },
       },
     },
-    "/api/v1/evidence/{evidenceId}/attachments": {
+    "/api/v1/diary-entries/{evidenceId}/attachments": {
       get: {
         summary: "List attachments with scan status",
         parameters: [uuidParam("evidenceId"), tenantHeader],
@@ -259,6 +228,58 @@ const document = {
         summary: "Soft-delete an attachment",
         parameters: [uuidParam("attachmentId"), tenantHeader],
         responses: { "200": ok, "404": uniform404 },
+      },
+    },
+    "/api/v1/exports": {
+      post: {
+        summary: "Create a point-in-time portable diary ZIP",
+        parameters: [tenantHeader],
+        requestBody: body(schemas.exportDiaryRequest),
+        responses: { "202": { description: "Export queued" }, "404": uniform404, "422": problemResponse },
+      },
+    },
+    "/api/v1/exports/{exportId}": {
+      get: {
+        summary: "Read the owner's diary export status",
+        parameters: [uuidParam("exportId"), tenantHeader],
+        responses: { "200": ok, "404": uniform404 },
+      },
+    },
+    "/api/v1/exports/{exportId}/download": {
+      get: {
+        summary: "Issue a short-lived download redirect for a ready diary ZIP",
+        parameters: [uuidParam("exportId"), tenantHeader],
+        responses: { "303": { description: "Redirect to signed URL" }, "404": uniform404 },
+      },
+    },
+    "/api/v1/enrolments/{enrolmentId}/diary/finish": {
+      post: {
+        summary: "Finish and lock the diary, queue its final copy and start the 90-day window",
+        parameters: [uuidParam("enrolmentId"), tenantHeader],
+        requestBody: body(schemas.finishDiaryRequest),
+        responses: { "200": ok, "404": uniform404, "422": problemResponse },
+      },
+    },
+    "/api/v1/enrolments/{enrolmentId}/diary/reopen": {
+      post: {
+        summary: "Reopen a finished diary during its access window and cancel that finish cycle",
+        parameters: [uuidParam("enrolmentId"), tenantHeader],
+        requestBody: body(schemas.reopenDiaryRequest),
+        responses: { "200": ok, "404": uniform404, "422": problemResponse },
+      },
+    },
+    "/api/v1/enrolments/{enrolmentId}/retention-hold": {
+      post: {
+        summary: "Place an exceptional retention hold (tenant administrator only)",
+        parameters: [uuidParam("enrolmentId"), tenantHeader],
+        requestBody: body(schemas.placeRetentionHoldRequest),
+        responses: { "201": created, "404": uniform404, "422": problemResponse },
+      },
+      delete: {
+        summary: "Release the active exceptional retention hold (tenant administrator only)",
+        parameters: [uuidParam("enrolmentId"), tenantHeader],
+        requestBody: body(schemas.releaseRetentionHoldRequest),
+        responses: { "200": ok, "404": uniform404, "422": problemResponse },
       },
     },
   },

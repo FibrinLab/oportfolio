@@ -38,7 +38,6 @@ export default async function PeoplePage({
                 <th style={{ padding: "var(--space-2)" }}>Fellow</th>
                 <th style={{ padding: "var(--space-2)" }}>Cohort</th>
                 <th style={{ padding: "var(--space-2)" }}>Status</th>
-                <th style={{ padding: "var(--space-2)" }}>Supervisors</th>
               </tr>
             </thead>
             <tbody>
@@ -52,9 +51,6 @@ export default async function PeoplePage({
                   </td>
                   <td style={{ padding: "var(--space-2)" }}>{e.cohortName}</td>
                   <td style={{ padding: "var(--space-2)" }}>[{e.status.toUpperCase()}]</td>
-                  <td style={{ padding: "var(--space-2)" }}>
-                    {e.supervisorNames.join(", ") || "—"}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -89,7 +85,6 @@ export default async function PeoplePage({
         <InviteFellowForm
           tenantId={tenantContext.tenantId}
           cohorts={view.cohorts}
-          supervisors={view.supervisors}
         />
       </section>
     </>

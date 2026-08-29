@@ -8,6 +8,7 @@ import {
   enrolment,
   evidenceItem,
   evidenceType,
+  exportJob,
   membership,
   programme,
   supervisorAssignment,
@@ -36,6 +37,7 @@ export interface Fixtures {
   tenantBSlug: string;
   tenantAId: string;
   enrolmentId: string;
+  lifecycleEnrolmentId: string;
   cohortId: string;
   // Evidence in each state the matrix needs.
   privateDraftId: string;
@@ -46,6 +48,7 @@ export interface Fixtures {
   cleanAttachmentOnSharedId: string;
   cleanAttachmentOnPrivateId: string;
   evidenceTypeId: string;
+  exportJobId: string;
   // Session cookie value per persona ("" for unauth).
   cookies: Record<PersonaId, string>;
 }
@@ -142,6 +145,15 @@ export async function buildFixtures(): Promise<Fixtures> {
     frameworkReleaseId,
     status: "active",
   });
+  const lifecycleEnrolmentId = uuidv7();
+  await db.insert(enrolment).values({
+    id: lifecycleEnrolmentId,
+    tenantId: tenantAId,
+    cohortId,
+    fellowUserId: otherFellow.userId,
+    frameworkReleaseId,
+    status: "active",
+  });
 
   await db.insert(supervisorAssignment).values([
     {
@@ -175,8 +187,6 @@ export async function buildFixtures(): Promise<Fixtures> {
 
   async function makeEvidence(input: {
     title: string;
-    visibility: "private" | "supervisors" | "faculty";
-    workflowState: "draft" | "shared";
     archived?: boolean;
     deleted?: boolean;
   }): Promise<string> {
@@ -190,8 +200,8 @@ export async function buildFixtures(): Promise<Fixtures> {
       evidenceTypeId: typeId!,
       narrativeDoc: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "fixture" }] }] },
       narrativeText: "fixture",
-      visibility: input.visibility,
-      workflowState: input.workflowState,
+      visibility: "private",
+      workflowState: "draft",
       archivedAt: input.archived ? new Date() : null,
       deletedAt: input.deleted ? new Date() : null,
       createdBy: owner.userId,
@@ -202,29 +212,19 @@ export async function buildFixtures(): Promise<Fixtures> {
 
   const privateDraftId = await makeEvidence({
     title: "AUTHZ-PRIVATE-CANARY",
-    visibility: "private",
-    workflowState: "draft",
   });
   const sharedSupervisorsId = await makeEvidence({
     title: "AUTHZ-SHARED-SUP",
-    visibility: "supervisors",
-    workflowState: "shared",
   });
   const facultySharedId = await makeEvidence({
     title: "AUTHZ-SHARED-FACULTY",
-    visibility: "faculty",
-    workflowState: "shared",
   });
   const archivedSharedId = await makeEvidence({
     title: "AUTHZ-ARCHIVED",
-    visibility: "supervisors",
-    workflowState: "shared",
     archived: true,
   });
   const softDeletedId = await makeEvidence({
     title: "AUTHZ-DELETED",
-    visibility: "supervisors",
-    workflowState: "shared",
     deleted: true,
   });
 
@@ -241,6 +241,7 @@ export async function buildFixtures(): Promise<Fixtures> {
       mediaTypeClaimed: "application/pdf",
       mediaTypeDetected: "application/pdf",
       sizeBytes: 100,
+      sha256: "0".repeat(64),
       scanStatus: "clean",
       createdBy: owner.userId,
       updatedBy: owner.userId,
@@ -249,12 +250,26 @@ export async function buildFixtures(): Promise<Fixtures> {
   }
   const cleanAttachmentOnSharedId = await makeCleanAttachment(sharedSupervisorsId);
   const cleanAttachmentOnPrivateId = await makeCleanAttachment(privateDraftId);
+  const exportJobId = uuidv7();
+  await db.insert(exportJob).values({
+    id: exportJobId,
+    tenantId: tenantAId,
+    enrolmentId,
+    requestedBy: owner.userId,
+    kind: "standard",
+    status: "ready",
+    snapshotJson: {},
+    objectKey: `${tenantAId}/exports/${exportJobId}.zip`,
+    artifactExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    completedAt: new Date(),
+  });
 
   return {
     tenantASlug,
     tenantBSlug,
     tenantAId,
     enrolmentId,
+    lifecycleEnrolmentId,
     cohortId,
     privateDraftId,
     sharedSupervisorsId,
@@ -264,6 +279,7 @@ export async function buildFixtures(): Promise<Fixtures> {
     cleanAttachmentOnSharedId,
     cleanAttachmentOnPrivateId,
     evidenceTypeId: typeId,
+    exportJobId,
     cookies: {
       unauth: "",
       wrongTenantFellow: wrongTenantFellow.cookie,

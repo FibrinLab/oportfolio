@@ -8,22 +8,26 @@ import {
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Readable } from "node:stream";
+import { getEnv } from "@/server/config/env";
 
 // S3-compatible private object storage (MinIO locally). Presigned URLs are
 // generated against the PUBLIC endpoint so the browser can reach them; the
 // server talks to the internal endpoint.
 
-export const QUARANTINE_BUCKET = process.env.S3_BUCKET_QUARANTINE ?? "oportfolio-quarantine";
-export const CLEAN_BUCKET = process.env.S3_BUCKET_CLEAN ?? "oportfolio-clean";
+// Read lazily: configuration is validated at server start, not at import.
+export const quarantineBucket = () => getEnv().S3_BUCKET_QUARANTINE;
+export const cleanBucket = () => getEnv().S3_BUCKET_CLEAN;
+export const exportBucket = () => getEnv().S3_BUCKET_EXPORT;
 
 function clientConfig(endpoint: string) {
+  const env = getEnv();
   return {
     endpoint,
-    region: process.env.S3_REGION ?? "us-east-1",
+    region: env.S3_REGION,
     forcePathStyle: true,
     credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "oportfolio",
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "oportfolio_dev",
+      accessKeyId: env.S3_ACCESS_KEY_ID,
+      secretAccessKey: env.S3_SECRET_ACCESS_KEY,
     },
   };
 }
@@ -35,9 +39,7 @@ const globalForS3 = globalThis as unknown as {
 
 export function getS3(): S3Client {
   if (!globalForS3.s3Internal) {
-    globalForS3.s3Internal = new S3Client(
-      clientConfig(process.env.S3_ENDPOINT ?? "http://localhost:9000"),
-    );
+    globalForS3.s3Internal = new S3Client(clientConfig(getEnv().S3_ENDPOINT));
   }
   return globalForS3.s3Internal;
 }
@@ -45,11 +47,7 @@ export function getS3(): S3Client {
 // Browser-reachable presigner (risk #4: never presign the internal hostname).
 export function getS3Public(): S3Client {
   if (!globalForS3.s3Public) {
-    globalForS3.s3Public = new S3Client(
-      clientConfig(
-        process.env.S3_PUBLIC_ENDPOINT ?? process.env.S3_ENDPOINT ?? "http://localhost:9000",
-      ),
-    );
+    globalForS3.s3Public = new S3Client(clientConfig(getEnv().s3PublicEndpoint));
   }
   return globalForS3.s3Public;
 }
@@ -64,7 +62,7 @@ export async function presignQuarantineUpload(
 ): Promise<{ url: string; fields: Record<string, string> }> {
   // POST policy (not PUT) so content-length-range is enforced server-side.
   const post = await createPresignedPost(getS3Public(), {
-    Bucket: QUARANTINE_BUCKET,
+    Bucket: quarantineBucket(),
     Key: objectKey,
     Conditions: [["content-length-range", 1, maxSizeBytes]],
     Expires: UPLOAD_EXPIRY_SECONDS,
@@ -73,29 +71,41 @@ export async function presignQuarantineUpload(
 }
 
 export async function headQuarantineObject(objectKey: string) {
-  return getS3().send(new HeadObjectCommand({ Bucket: QUARANTINE_BUCKET, Key: objectKey }));
+  return getS3().send(new HeadObjectCommand({ Bucket: quarantineBucket(), Key: objectKey }));
 }
 
 export async function getQuarantineStream(objectKey: string): Promise<Readable> {
   const result = await getS3().send(
-    new GetObjectCommand({ Bucket: QUARANTINE_BUCKET, Key: objectKey }),
+    new GetObjectCommand({ Bucket: quarantineBucket(), Key: objectKey }),
   );
+  return result.Body as Readable;
+}
+
+export async function getCleanStream(objectKey: string): Promise<Readable> {
+  const result = await getS3().send(
+    new GetObjectCommand({ Bucket: cleanBucket(), Key: objectKey }),
+  );
+  if (!result.Body) throw new Error("Attachment object has no body.");
   return result.Body as Readable;
 }
 
 export async function promoteToClean(objectKey: string): Promise<void> {
   await getS3().send(
     new CopyObjectCommand({
-      Bucket: CLEAN_BUCKET,
+      Bucket: cleanBucket(),
       Key: objectKey,
-      CopySource: `${QUARANTINE_BUCKET}/${encodeURIComponent(objectKey)}`,
+      CopySource: `${quarantineBucket()}/${encodeURIComponent(objectKey)}`,
     }),
   );
-  await getS3().send(new DeleteObjectCommand({ Bucket: QUARANTINE_BUCKET, Key: objectKey }));
+  await getS3().send(new DeleteObjectCommand({ Bucket: quarantineBucket(), Key: objectKey }));
 }
 
 export async function deleteQuarantineObject(objectKey: string): Promise<void> {
-  await getS3().send(new DeleteObjectCommand({ Bucket: QUARANTINE_BUCKET, Key: objectKey }));
+  await getS3().send(new DeleteObjectCommand({ Bucket: quarantineBucket(), Key: objectKey }));
+}
+
+export async function deleteCleanObject(objectKey: string): Promise<void> {
+  await getS3().send(new DeleteObjectCommand({ Bucket: cleanBucket(), Key: objectKey }));
 }
 
 export async function presignCleanDownload(
@@ -108,11 +118,32 @@ export async function presignCleanDownload(
   return getSignedUrl(
     getS3Public(),
     new GetObjectCommand({
-      Bucket: CLEAN_BUCKET,
+      Bucket: cleanBucket(),
       Key: objectKey,
       ResponseContentDisposition: `attachment; filename="${safeName}"`,
       ResponseContentType: contentType,
     }),
     { expiresIn: DOWNLOAD_EXPIRY_SECONDS },
   );
+}
+
+export async function presignExportDownload(
+  objectKey: string,
+  displayName: string,
+): Promise<string> {
+  const safeName = displayName.replace(/[^\w.\- ]+/g, "_").slice(0, 120) || "diary-export.zip";
+  return getSignedUrl(
+    getS3Public(),
+    new GetObjectCommand({
+      Bucket: exportBucket(),
+      Key: objectKey,
+      ResponseContentDisposition: `attachment; filename="${safeName}"`,
+      ResponseContentType: "application/zip",
+    }),
+    { expiresIn: DOWNLOAD_EXPIRY_SECONDS },
+  );
+}
+
+export async function deleteExportObject(objectKey: string): Promise<void> {
+  await getS3().send(new DeleteObjectCommand({ Bucket: exportBucket(), Key: objectKey }));
 }

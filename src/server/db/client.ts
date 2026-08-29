@@ -1,5 +1,6 @@
 import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { getEnv } from "@/server/config/env";
 import * as schema from "./schema";
 
 // Pool lives on globalThis so Next.js dev hot-reload doesn't exhaust
@@ -11,9 +12,9 @@ const globalForDb = globalThis as unknown as {
 export function getPool(): Pool {
   if (!globalForDb.pgPool) {
     globalForDb.pgPool = new Pool({
-      connectionString:
-        process.env.DATABASE_URL ??
-        "postgres://oportfolio:oportfolio_dev@localhost:5432/oportfolio",
+      // TLS: append `?sslmode=verify-full` (or `require`) to DATABASE_URL —
+      // node-postgres honours it. See docs/deployment.md.
+      connectionString: getEnv().DATABASE_URL,
       max: 10,
     });
   }

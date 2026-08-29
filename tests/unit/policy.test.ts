@@ -4,6 +4,7 @@ import {
   canCreateEvidence,
   canDownloadAttachment,
   canEditEvidence,
+  canExportDiary,
   canInvite,
   canReadEnrolment,
   canReadEvidence,
@@ -41,6 +42,9 @@ const enrolment: EnrolmentContext = {
   fellowUserId: FELLOW,
   programmeId: PROGRAMME,
   cohortId: COHORT,
+  diaryState: "open",
+  diaryFinishCycle: 0,
+  diaryAccessEndsAt: null,
 };
 
 function evidence(overrides: Partial<EvidenceContext> = {}): EvidenceContext {
@@ -107,19 +111,20 @@ describe("canReadEvidence", () => {
     expect(canReadEvidence(facultyMember, item, enrolment).allow).toBe(false);
   });
 
-  it("supervisor-visible items reach only assigned supervisors", () => {
+  it("legacy supervisor visibility never grants diary access", () => {
     const item = evidence({ visibility: "supervisors", workflowState: "shared" });
-    expect(canReadEvidence(assignedSupervisor, item, enrolment).allow).toBe(true);
+    expect(canReadEvidence(ownerFellow, item, enrolment).allow).toBe(true);
+    expect(canReadEvidence(assignedSupervisor, item, enrolment).allow).toBe(false);
     expect(canReadEvidence(priorSupervisor, item, enrolment).allow).toBe(false);
     expect(canReadEvidence(otherFellow, item, enrolment).allow).toBe(false);
     expect(canReadEvidence(facultyMember, item, enrolment).allow).toBe(false);
   });
 
-  it("faculty-visible items reach scoped faculty and assigned supervisors", () => {
+  it("legacy faculty visibility never grants diary access", () => {
     const item = evidence({ visibility: "faculty", workflowState: "shared" });
-    expect(canReadEvidence(facultyMember, item, enrolment).allow).toBe(true);
+    expect(canReadEvidence(facultyMember, item, enrolment).allow).toBe(false);
     expect(canReadEvidence(wrongProgrammeFaculty, item, enrolment).allow).toBe(false);
-    expect(canReadEvidence(assignedSupervisor, item, enrolment).allow).toBe(true);
+    expect(canReadEvidence(assignedSupervisor, item, enrolment).allow).toBe(false);
   });
 
   it("cross-tenant actors are denied whatever the visibility", () => {
@@ -146,12 +151,21 @@ describe("canEditEvidence", () => {
     expect(canEditEvidence(ownerFellow, evidence({ archivedAt: new Date() }), enrolment).allow).toBe(false);
     expect(canEditEvidence(ownerFellow, evidence({ deletedAt: new Date() }), enrolment).allow).toBe(false);
   });
+
+  it("a finished or purged diary is read-only", () => {
+    expect(
+      canEditEvidence(ownerFellow, evidence(), { ...enrolment, diaryState: "finished" }).allow,
+    ).toBe(false);
+    expect(
+      canEditEvidence(ownerFellow, evidence(), { ...enrolment, diaryState: "purged" }).allow,
+    ).toBe(false);
+  });
 });
 
 describe("canReadEnrolment / canCreateEvidence", () => {
-  it("fellow, assigned supervisor and scoped faculty read the enrolment", () => {
+  it("the fellow and scoped programme staff read enrolment metadata", () => {
     expect(canReadEnrolment(ownerFellow, enrolment).allow).toBe(true);
-    expect(canReadEnrolment(assignedSupervisor, enrolment).allow).toBe(true);
+    expect(canReadEnrolment(assignedSupervisor, enrolment).allow).toBe(false);
     expect(canReadEnrolment(facultyMember, enrolment).allow).toBe(true);
     expect(canReadEnrolment(otherFellow, enrolment).allow).toBe(false);
     expect(canReadEnrolment(priorSupervisor, enrolment).allow).toBe(false);
@@ -162,6 +176,7 @@ describe("canReadEnrolment / canCreateEvidence", () => {
     expect(canCreateEvidence(ownerFellow, enrolment).allow).toBe(true);
     expect(canCreateEvidence(assignedSupervisor, enrolment).allow).toBe(false);
     expect(canCreateEvidence(facultyMember, enrolment).allow).toBe(false);
+    expect(canCreateEvidence(ownerFellow, { ...enrolment, diaryState: "finished" }).allow).toBe(false);
   });
 });
 
@@ -186,6 +201,31 @@ describe("canDownloadAttachment", () => {
         canDownloadAttachment({ ...cleanAttachment, scanStatus }, { allow: true }).allow,
       ).toBe(false);
     }
+  });
+});
+
+describe("canExportDiary", () => {
+  it("allows only the owner before the access deadline", () => {
+    expect(canExportDiary(ownerFellow, enrolment).allow).toBe(true);
+    expect(canExportDiary(facultyMember, enrolment).allow).toBe(false);
+    expect(canExportDiary(assignedSupervisor, enrolment).allow).toBe(false);
+    expect(
+      canExportDiary(ownerFellow, {
+        ...enrolment,
+        diaryState: "finished",
+        diaryAccessEndsAt: new Date(Date.now() + 60_000),
+      }).allow,
+    ).toBe(true);
+    expect(
+      canExportDiary(ownerFellow, {
+        ...enrolment,
+        diaryState: "finished",
+        diaryAccessEndsAt: new Date(Date.now() - 60_000),
+      }).allow,
+    ).toBe(false);
+    expect(
+      canExportDiary(ownerFellow, { ...enrolment, diaryState: "purged" }).allow,
+    ).toBe(false);
   });
 });
 

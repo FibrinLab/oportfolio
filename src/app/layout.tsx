@@ -31,7 +31,7 @@ const plexSans = localFont({
 export const metadata: Metadata = {
   // Neutral titles only — no portfolio content in browser tabs (spec/02).
   title: { default: "oPortfolio", template: "%s — oPortfolio" },
-  description: "Learning portfolio for the NHS Fellowship in Clinical AI",
+  description: "Independent private diary for personal learning and reflection",
   robots: { index: false, follow: false },
 };
 

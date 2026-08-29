@@ -1,17 +1,19 @@
 import { eq, sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
+import { getEnv } from "@/server/config/env";
 import type { Db } from "@/server/db/client";
 import { appUser, magicLinkToken, membership } from "@/server/db/schema";
 import { appendAudit } from "@/server/audit/audit";
 import { enqueue } from "@/server/outbox/outbox";
 import { checkRateLimit } from "./rateLimit";
 import { createSession } from "./sessions";
+import { ensureSelfServiceAccount } from "./selfService";
 import { generateToken, hashToken, normaliseEmail } from "./tokens";
 
 export const MAGIC_LINK_EXPIRY_MINUTES = 15;
 
-// Uniform behavior regardless of whether the address is registered — the
-// caller always responds "if that address is registered…" (no enumeration).
+// Uniform behavior for new and existing addresses. A new account is created
+// only after its single-use link is verified, never at request time.
 export async function requestMagicLink(
   db: Db,
   rawEmail: string,
@@ -31,18 +33,18 @@ export async function requestMagicLink(
     .where(eq(appUser.emailNormalised, email))
     .limit(1);
   const user = users[0];
-  if (!user || user.status !== "active") return;
+  if (user?.status === "suspended") return;
 
   const { token, tokenHash } = generateToken();
   await db.transaction(async (tx) => {
     await tx.insert(magicLinkToken).values({
       id: uuidv7(),
       emailNormalised: email,
-      userId: user.id,
+      userId: user?.id ?? null,
       tokenHash,
       expiresAt: new Date(Date.now() + MAGIC_LINK_EXPIRY_MINUTES * 60 * 1000),
     });
-    const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+    const baseUrl = getEnv().APP_BASE_URL;
     await enqueue(tx, "send_email", {
       to: email,
       template: "magic_link",
@@ -71,10 +73,15 @@ export async function consumeMagicLink(
     const claimed = await tx.execute(sql`
       UPDATE magic_link_token SET used_at = now()
       WHERE token_hash = ${tokenHash} AND used_at IS NULL AND expires_at > now()
-      RETURNING user_id
+      RETURNING user_id, email_normalised
     `);
-    const userId = claimed.rows[0]?.user_id as string | undefined;
-    if (!userId) return null;
+    const claimedToken = claimed.rows[0];
+    if (!claimedToken) return null;
+
+    const email = claimedToken.email_normalised as string;
+    const account = await ensureSelfServiceAccount(tx, email, requestId);
+    if (!account) return null;
+    const userId = account.userId;
 
     const users = await tx
       .select({

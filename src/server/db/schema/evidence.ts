@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   date,
   foreignKey,
   index,
@@ -98,9 +99,7 @@ export const evidenceItem = pgTable(
     title: text("title").notNull(),
     activityDate: date("activity_date"),
     activityEndedOn: date("activity_ended_on"),
-    evidenceTypeId: uuid("evidence_type_id")
-      .notNull()
-      .references(() => evidenceType.id),
+    evidenceTypeId: uuid("evidence_type_id").references(() => evidenceType.id),
     // Restricted portable rich-text document (canonical storage).
     narrativeDoc: jsonb("narrative_doc").notNull(),
     // Plain-text extraction for authorised search only.
@@ -130,6 +129,10 @@ export const evidenceItem = pgTable(
       .on(t.enrolmentId, t.activityDate)
       .where(sql`${t.deletedAt} IS NULL`),
     index("evidence_item_author_idx").on(t.authorUserId),
+    check(
+      "evidence_item_private_only_check",
+      sql`${t.visibility} = 'private' AND ${t.workflowState} = 'draft'`,
+    ),
   ],
 );
 

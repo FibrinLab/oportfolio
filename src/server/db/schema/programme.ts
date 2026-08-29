@@ -28,6 +28,7 @@ export const enrolmentStatus = pgEnum("enrolment_status", [
   "withdrawn",
 ]);
 export const assignmentType = pgEnum("assignment_type", ["primary", "co_supervisor"]);
+export const diaryState = pgEnum("diary_state", ["open", "finished", "purged"]);
 
 export const programme = pgTable(
   "programme",
@@ -99,6 +100,13 @@ export const enrolment = pgTable(
     status: enrolmentStatus("status").notNull().default("provisional"),
     statusReason: text("status_reason"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    diaryState: diaryState("diary_state").notNull().default("open"),
+    // Incremented on every finish. Delayed worker messages carry this value
+    // and become harmless when the fellow reopens the diary.
+    diaryFinishCycle: integer("diary_finish_cycle").notNull().default(0),
+    diaryFinishedAt: timestamp("diary_finished_at", { withTimezone: true }),
+    diaryAccessEndsAt: timestamp("diary_access_ends_at", { withTimezone: true }),
+    diaryPurgedAt: timestamp("diary_purged_at", { withTimezone: true }),
     ...mutableColumns,
   },
   (t) => [

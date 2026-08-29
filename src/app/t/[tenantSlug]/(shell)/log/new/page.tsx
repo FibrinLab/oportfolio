@@ -24,12 +24,7 @@ export default async function NewEvidencePage({
   if (!tenantContext) notFound();
 
   const context = await getEditorContext(actor, tenantContext.tenantId);
-  if (!context) notFound();
-
-  const defaultType =
-    context.options.types.find((t) => t.stableCode === "learning_record") ??
-    context.options.types[0];
-  if (!defaultType) notFound();
+  if (!context || context.enrolment.diaryState !== "open") notFound();
 
   const priorReflectionAck = await getDb()
     .select({ id: noticeAcknowledgement.id })
@@ -51,18 +46,13 @@ export default async function NewEvidencePage({
         id: null,
         title: "",
         activityDate: new Date().toISOString().slice(0, 10),
-        evidenceTypeId: defaultType.id,
+        evidenceTypeId: null,
         narrativeDoc: { type: "doc", content: [{ type: "paragraph" }] },
-        typeFieldsJson: null,
-        provenanceId: null,
-        visibility: "private",
-        workflowState: "draft",
         // "Add evidence for this objective" preselects it; the entry still
         // starts private (spec/09 S-07).
         objectiveIds: context.pickerObjectives.some((o) => o.id === preselectedObjective)
           ? [preselectedObjective!]
           : [],
-        dutyIds: [],
         rowVersion: 1,
       }}
       options={context.options}

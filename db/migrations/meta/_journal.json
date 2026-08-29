@@ -29,6 +29,20 @@
       "when": 1786550388723,
       "tag": "0003_fix_release_immutability_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787878024786,
+      "tag": "0004_private_diary_export",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787928001805,
+      "tag": "0005_warm_post",
+      "breakpoints": true
     }
   ]
 }

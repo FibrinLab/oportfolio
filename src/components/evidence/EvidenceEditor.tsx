@@ -10,10 +10,10 @@ import styles from "./EvidenceEditor.module.css";
 import { FilesAndLinks } from "./FilesAndLinks";
 import { ObjectivePicker, type PickerObjective } from "./ObjectivePicker";
 import { SaveStatus } from "./SaveStatus";
+import { DiaryEntryActions } from "./DiaryEntryActions";
 import {
   REFLECTION_ACK_LABEL,
   REFLECTION_SAFETY_TEXT,
-  TYPE_FIELDS,
 } from "./typeFields";
 
 // The rich editor is the largest client chunk — load it only on editor routes
@@ -27,36 +27,21 @@ export interface EditorEvidence {
   id: string | null;
   title: string;
   activityDate: string | null;
-  evidenceTypeId: string;
+  evidenceTypeId: string | null;
   narrativeDoc: unknown;
-  typeFieldsJson: Record<string, unknown> | null;
-  provenanceId: string | null;
-  visibility: "private" | "supervisors" | "faculty";
-  workflowState: string;
   objectiveIds: string[];
-  dutyIds: string[];
   rowVersion: number;
 }
 
 export interface EditorOptions {
   types: Array<{ id: string; stableCode: string; label: string; description: string | null }>;
-  provenances: Array<{ id: string; stableCode: string; label: string }>;
-  duties: Array<{ id: string; stableCode: string; label: string; description: string | null }>;
 }
-
-const VISIBILITY_LABEL: Record<string, string> = {
-  private: "Only me",
-  supervisors: "Me + supervisors",
-  faculty: "Me + supervisors + faculty",
-};
 
 interface DraftPayload {
   title: string;
   activityDate: string | null;
-  evidenceTypeId: string;
+  evidenceTypeId: string | null;
   narrativeDoc: unknown;
-  typeFieldsJson: Record<string, unknown> | null;
-  provenanceId: string | null;
 }
 
 export function EvidenceEditor({
@@ -75,7 +60,7 @@ export function EvidenceEditor({
   initial: EditorEvidence;
   options: EditorOptions;
   pickerObjectives: PickerObjective[];
-  frameworkLabel: string;
+  frameworkLabel: string | null;
   reflectionAcknowledgedBefore: boolean;
   initialFiles?: Array<{ id: string; displayName: string; sizeBytes: number; scanStatus: string }>;
   initialLinks?: Array<{ id: string; url: string; host: string; label: string | null }>;
@@ -83,47 +68,37 @@ export function EvidenceEditor({
   const [evidenceId, setEvidenceId] = useState(initial.id);
   const [title, setTitle] = useState(initial.title);
   const [activityDate, setActivityDate] = useState(initial.activityDate ?? "");
-  const [evidenceTypeId, setEvidenceTypeId] = useState(initial.evidenceTypeId);
-  const [provenanceId, setProvenanceId] = useState(initial.provenanceId ?? "");
-  const [typeFields, setTypeFields] = useState<Record<string, unknown>>(
-    initial.typeFieldsJson ?? {},
-  );
+  const [evidenceTypeId, setEvidenceTypeId] = useState(initial.evidenceTypeId ?? "");
   const [objectiveIds, setObjectiveIds] = useState<string[]>(initial.objectiveIds);
-  const [dutyIds, setDutyIds] = useState<string[]>(initial.dutyIds);
   const [reflectionAck, setReflectionAck] = useState(reflectionAcknowledgedBefore);
   const [mappingError, setMappingError] = useState<string | null>(null);
   const narrativeRef = useRef<unknown>(initial.narrativeDoc);
   const evidenceIdRef = useRef(initial.id);
   const objectiveIdsRef = useRef(initial.objectiveIds);
-  const dutyIdsRef = useRef(initial.dutyIds);
   useEffect(() => {
     objectiveIdsRef.current = objectiveIds;
-    dutyIdsRef.current = dutyIds;
-  }, [objectiveIds, dutyIds]);
+  }, [objectiveIds]);
 
   const selectedType = options.types.find((t) => t.id === evidenceTypeId);
-  const typeCode = selectedType?.stableCode ?? "learning_record";
+  const typeCode = selectedType?.stableCode ?? "entry";
   const isReflection = typeCode === "reflection";
-  const extraFields = TYPE_FIELDS[typeCode] ?? [];
 
   // Latest-fields ref: touch() runs inside change handlers where the state
   // setters have not re-rendered yet, so reading state through a closure
   // would send stale values. Handlers pass their fresh value as an override;
   // the ref carries everything else from the last committed render.
-  const fieldsRef = useRef({ title, activityDate, evidenceTypeId, provenanceId, typeFields });
+  const fieldsRef = useRef({ title, activityDate, evidenceTypeId });
   useEffect(() => {
-    fieldsRef.current = { title, activityDate, evidenceTypeId, provenanceId, typeFields };
-  }, [title, activityDate, evidenceTypeId, provenanceId, typeFields]);
+    fieldsRef.current = { title, activityDate, evidenceTypeId };
+  }, [title, activityDate, evidenceTypeId]);
 
   const buildDraft = useCallback((overrides?: Partial<typeof fieldsRef.current>): DraftPayload => {
     const current = { ...fieldsRef.current, ...overrides };
     return {
       title: current.title,
       activityDate: current.activityDate || null,
-      evidenceTypeId: current.evidenceTypeId,
+      evidenceTypeId: current.evidenceTypeId || null,
       narrativeDoc: narrativeRef.current,
-      typeFieldsJson: Object.keys(current.typeFields).length ? current.typeFields : null,
-      provenanceId: current.provenanceId || null,
     };
   }, []);
 
@@ -143,7 +118,7 @@ export function EvidenceEditor({
           return { ok: false as const, message: "Add a title to start the draft." };
         }
         const created = await api<{ id: string; rowVersion: number }>(
-          `/api/v1/enrolments/${enrolmentId}/evidence`,
+          `/api/v1/enrolments/${enrolmentId}/diary-entries`,
           {
             method: "POST",
             tenantSlug,
@@ -165,40 +140,20 @@ export function EvidenceEditor({
         window.history.replaceState(null, "", `/t/${tenantSlug}/log/${created.data.id}`);
         // Sync mappings picked before the draft existed.
         if (objectiveIdsRef.current.length > 0) {
-          void api(`/api/v1/evidence/${created.data.id}/objectives`, {
+          void api(`/api/v1/diary-entries/${created.data.id}/objectives`, {
             method: "PUT",
             tenantSlug,
             body: { objectiveIds: objectiveIdsRef.current },
           });
         }
-        if (dutyIdsRef.current.length > 0) {
-          void api(`/api/v1/evidence/${created.data.id}/duties`, {
-            method: "PUT",
-            tenantSlug,
-            body: { dutyIds: dutyIdsRef.current },
-          });
-        }
-        // Push the remaining fields (provenance/type fields) in a follow-up PATCH.
-        const followUp = await api<{ rowVersion: number }>(
-          `/api/v1/evidence/${created.data.id}`,
-          {
-            method: "PATCH",
-            tenantSlug,
-            ifMatch: created.data.rowVersion,
-            body: {
-              typeFieldsJson: draft.typeFieldsJson,
-              provenanceId: draft.provenanceId,
-            },
-          },
-        );
         return {
           ok: true as const,
-          rowVersion: followUp.ok ? followUp.data.rowVersion : created.data.rowVersion,
+          rowVersion: created.data.rowVersion,
         };
       }
 
       const result = await api<{ rowVersion: number }>(
-        `/api/v1/evidence/${evidenceIdRef.current}`,
+        `/api/v1/diary-entries/${evidenceIdRef.current}`,
         {
           method: "PATCH",
           tenantSlug,
@@ -210,7 +165,7 @@ export function EvidenceEditor({
       if (result.problem.status === 412) {
         // Preserve this tab's words server-side BEFORE showing the choice —
         // the conflict panel promises they are recoverable (AC-04).
-        await api(`/api/v1/evidence/${evidenceIdRef.current}/revisions`, {
+        await api(`/api/v1/diary-entries/${evidenceIdRef.current}/revisions`, {
           method: "POST",
           tenantSlug,
           body: { snapshot: draft as unknown as Record<string, unknown> },
@@ -250,7 +205,7 @@ export function EvidenceEditor({
       touch();
       return;
     }
-    const result = await api(`/api/v1/evidence/${evidenceIdRef.current}/objectives`, {
+    const result = await api(`/api/v1/diary-entries/${evidenceIdRef.current}/objectives`, {
       method: "PUT",
       tenantSlug,
       body: { objectiveIds: next },
@@ -260,19 +215,7 @@ export function EvidenceEditor({
     }
   }
 
-  async function syncDuties(next: string[]) {
-    setDutyIds(next);
-    if (!evidenceIdRef.current) return;
-    await api(`/api/v1/evidence/${evidenceIdRef.current}/duties`, {
-      method: "PUT",
-      tenantSlug,
-      body: { dutyIds: next },
-    });
-  }
-
   const conflict = autosave.state.kind === "conflict" ? autosave.state : null;
-
-  const audienceLabel = VISIBILITY_LABEL[initial.visibility] ?? initial.visibility;
 
   return (
     <div style={{ maxWidth: "var(--content-max)" }}>
@@ -289,24 +232,20 @@ export function EvidenceEditor({
         }}
       >
         <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap" }}>
-          <Link href={`/t/${tenantSlug}/log`}>Back to log</Link>
-          <span className="stamp">[{initial.workflowState === "shared" ? "SHARED" : "DRAFT"}]</span>
-          <span className="stamp" aria-label={`Audience: ${audienceLabel}`}>
-            {audienceLabel}
-          </span>
+          <Link href={`/t/${tenantSlug}/log`}>Back to diary</Link>
+          <span className="stamp">[PRIVATE DIARY]</span>
           <SaveStatus state={autosave.state} />
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <button type="button" className={forms.buttonSecondary} onClick={() => void autosave.flush()}>
             Save draft
           </button>
-          {evidenceId ? (
-            <Link href={`/t/${tenantSlug}/log/${evidenceId}/share`} className={forms.buttonPrimary} style={{ display: "inline-flex", alignItems: "center" }}>
-              Preview audience and share
-            </Link>
-          ) : null}
         </div>
       </div>
+
+      {evidenceId ? (
+        <DiaryEntryActions tenantSlug={tenantSlug} entryId={evidenceId} mode="active" />
+      ) : null}
 
       {conflict ? (
         <div role="alert" className={forms.notice} style={{ borderLeftWidth: 4 }}>
@@ -362,7 +301,7 @@ export function EvidenceEditor({
           <div style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap" }}>
             <div className={forms.field} style={{ flex: 1, minWidth: 220 }}>
               <label htmlFor="ev-date" className={forms.label}>
-                Activity date <span style={{ fontWeight: 400 }}>(Required to share)</span>
+                Activity date
               </label>
               <input
                 id="ev-date"
@@ -377,7 +316,7 @@ export function EvidenceEditor({
             </div>
             <div className={forms.field} style={{ flex: 1, minWidth: 220 }}>
               <label htmlFor="ev-type" className={forms.label}>
-                Evidence type <span style={{ fontWeight: 400 }}>(Required)</span>
+                Entry type <span style={{ fontWeight: 400 }}>(Optional)</span>
               </label>
               <select
                 id="ev-type"
@@ -388,6 +327,7 @@ export function EvidenceEditor({
                   touch({ evidenceTypeId: event.target.value });
                 }}
               >
+                <option value="">No type</option>
                 {options.types.map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.label}
@@ -420,7 +360,7 @@ export function EvidenceEditor({
 
           <div className={forms.field}>
             <span id="ev-narrative-label" className={forms.label}>
-              What happened / what this shows <span style={{ fontWeight: 400 }}>(Required to share)</span>
+              Reflection
             </span>
             <p className={forms.hint}>
               20–20,000 characters. Headings, lists, bold, italics and safe links are available.
@@ -435,114 +375,27 @@ export function EvidenceEditor({
             />
           </div>
 
-          {extraFields.length > 0 ? (
-            <fieldset style={{ border: "1px solid var(--rule)", padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
-              <legend style={{ fontWeight: 700, padding: "0 var(--space-2)" }}>
-                {selectedType?.label} details
-              </legend>
-              {extraFields.map((field) => (
-                <div key={field.key} className={forms.field}>
-                  <label htmlFor={`tf-${field.key}`} className={forms.label}>
-                    {field.label}{" "}
-                    {field.required ? <span style={{ fontWeight: 400 }}>(Required to share)</span> : null}
-                  </label>
-                  {field.hint ? <p className={forms.hint}>{field.hint}</p> : null}
-                  {field.kind === "select" ? (
-                    <select
-                      id={`tf-${field.key}`}
-                      className={forms.select}
-                      value={String(typeFields[field.key] ?? "")}
-                      onChange={(event) => {
-                        const next = { ...fieldsRef.current.typeFields, [field.key]: event.target.value };
-                        setTypeFields(next);
-                        touch({ typeFields: next });
-                      }}
-                    >
-                      <option value="">Choose…</option>
-                      {field.options?.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      id={`tf-${field.key}`}
-                      type={field.kind === "date" ? "date" : "text"}
-                      className={forms.input}
-                      value={String(typeFields[field.key] ?? "")}
-                      onChange={(event) => {
-                        const next = { ...fieldsRef.current.typeFields, [field.key]: event.target.value };
-                        setTypeFields(next);
-                        touch({ typeFields: next });
-                      }}
-                    />
-                  )}
-                </div>
-              ))}
-            </fieldset>
-          ) : null}
         </div>
 
-        <aside aria-label="Mapping and context">
-          <div className={forms.field}>
-            <label htmlFor="ev-provenance" className={forms.label}>
-              Delivery source <span style={{ fontWeight: 400 }}>(Required to share)</span>
-            </label>
-            <select
-              id="ev-provenance"
-              className={forms.select}
-              value={provenanceId}
-              onChange={(event) => {
-                setProvenanceId(event.target.value);
-                touch({ provenanceId: event.target.value });
-              }}
-            >
-              <option value="">Choose…</option>
-              {options.provenances.map((provenance) => (
-                <option key={provenance.id} value={provenance.id}>
-                  {provenance.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={forms.field}>
-            <ObjectivePicker
-              objectives={pickerObjectives}
-              selectedIds={objectiveIds}
-              onChange={(next) => void syncObjectives(next)}
-              frameworkLabel={frameworkLabel}
-            />
-            {mappingError ? (
-              <p role="alert" className={forms.error}>
-                ERROR: {mappingError}
-              </p>
-            ) : null}
-            {!evidenceId ? (
-              <p className={forms.hint}>Objective mappings save once the draft is created.</p>
-            ) : null}
-          </div>
-
-          <fieldset style={{ border: "1px solid var(--rule)", padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-            <legend style={{ fontWeight: 700, padding: "0 var(--space-2)" }}>Fellowship duties</legend>
-            {options.duties.map((dutyOption) => (
-              <label key={dutyOption.id} className={forms.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={dutyIds.includes(dutyOption.id)}
-                  onChange={(event) =>
-                    void syncDuties(
-                      event.target.checked
-                        ? [...dutyIds, dutyOption.id]
-                        : dutyIds.filter((d) => d !== dutyOption.id),
-                    )
-                  }
-                />
-                <span title={dutyOption.description ?? undefined}>{dutyOption.label}</span>
-              </label>
-            ))}
-          </fieldset>
+        <aside aria-label="Entry details">
+          {frameworkLabel ? (
+            <div className={forms.field}>
+              <ObjectivePicker
+                objectives={pickerObjectives}
+                selectedIds={objectiveIds}
+                onChange={(next) => void syncObjectives(next)}
+                frameworkLabel={frameworkLabel}
+              />
+              {mappingError ? (
+                <p role="alert" className={forms.error}>
+                  ERROR: {mappingError}
+                </p>
+              ) : null}
+              {!evidenceId ? (
+                <p className={forms.hint}>Objective mappings save once the draft is created.</p>
+              ) : null}
+            </div>
+          ) : null}
 
           {evidenceId ? (
             <FilesAndLinks
@@ -558,8 +411,8 @@ export function EvidenceEditor({
           <div className={forms.notice}>
             <p className={forms.noticeTitle}>PRIVACY</p>
             <p>
-              Audience: <strong>{audienceLabel}</strong>. New entries are private until you
-              deliberately share them.
+              This entry is visible only to you. Other users cannot read its title, date, files,
+              links, or reflection.
             </p>
           </div>
         </aside>

@@ -83,7 +83,7 @@ export function ObjectivePicker({
   return (
     <div>
       <label htmlFor={`${baseId}-input`} className={forms.label}>
-        Curriculum objectives <span style={{ fontWeight: 400 }}>(Required — at least one to share)</span>
+        Curriculum objectives <span style={{ fontWeight: 400 }}>(Optional)</span>
       </label>
       <p className={forms.hint}>Mapping to {frameworkLabel}. Search by code or wording, or browse by domain.</p>
 

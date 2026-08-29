@@ -17,8 +17,8 @@ export function SignInForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      // Uniform response regardless of whether the address is registered —
-      // no account enumeration (spec/12).
+      // New and existing addresses receive the same response, so account
+      // status cannot be discovered from this form.
       setState(response.ok || response.status === 429 ? "sent" : "error");
     } catch {
       setState("error");
@@ -37,8 +37,8 @@ export function SignInForm() {
       >
         <p style={{ fontWeight: 700 }}>NOTE</p>
         <p>
-          If that address is registered, a sign-in link has been sent to it. The link
-          expires in 15 minutes.
+          Check your inbox for an access link. It expires in 15 minutes. If this is your
+          first time, following it will create your private diary.
         </p>
       </div>
     );
@@ -53,7 +53,7 @@ export function SignInForm() {
         id="email-hint"
         style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)", marginBottom: "var(--space-2)" }}
       >
-        Use the address your programme invitation was sent to.
+        Use any email address you can access. No invitation is needed.
       </p>
       <input
         id="email"
@@ -93,7 +93,7 @@ export function SignInForm() {
           fontWeight: 700,
         }}
       >
-        {state === "submitting" ? "Sending…" : "Email me a sign-in link"}
+        {state === "submitting" ? "Sending…" : "Continue with email"}
       </button>
     </form>
   );

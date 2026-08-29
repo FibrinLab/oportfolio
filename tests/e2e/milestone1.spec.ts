@@ -1,10 +1,9 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { latestEmailLink, signInViaMagicLink, uniqueSuffix } from "./helpers";
 
-// Milestone 1 definition-of-done journey (MILESTONES.md + spec/15):
-// AC-01 invitation and pinned curriculum; AC-02 private by default;
-// AC-03 evidence and mappings; AC-04 autosave conflict; AC-05 upload UI.
-// Serial: later steps use earlier state.
+// Private-diary definition-of-done journey: onboarding and pinned curriculum,
+// owner-only entries, mappings, conflict recovery, links, portable export and
+// the finish/reopen lifecycle. Serial: later steps use earlier state.
 
 test.describe.configure({ mode: "serial" });
 
@@ -31,7 +30,6 @@ test("AC-01: faculty invites; fellow onboards and sees the pinned curriculum", a
   await facultyPage.goto("/t/demo/faculty/people");
   await facultyPage.getByLabel("Email address (Required)").fill(fellowEmail);
   await facultyPage.getByLabel("Name (Required)").fill(fellowName);
-  await facultyPage.getByLabel("Primary supervisor").selectOption({ label: "Sam Supervisor" });
   await facultyPage.getByRole("button", { name: "Send invitation" }).click();
   await expect(facultyPage.getByRole("status")).toContainText("Invitation sent");
   await facultyContext.close();
@@ -40,13 +38,13 @@ test("AC-01: faculty invites; fellow onboards and sees the pinned curriculum", a
   const inviteLink = await latestEmailLink(
     request,
     fellowEmail,
-    /http:\/\/localhost:3000\/invite\/[\w-]+/,
+    /https?:\/\/localhost:\d+\/invite\/[\w-]+/,
   );
   fellowContext = await browser.newContext();
   fellowPage = await fellowContext.newPage();
   await fellowPage.goto(inviteLink);
   await expect(fellowPage.getByRole("heading", { name: "Welcome to oPortfolio" })).toBeVisible();
-  await expect(fellowPage.getByText("Sam Supervisor")).toBeVisible();
+  await expect(fellowPage.getByText(/visible only to you/i)).toBeVisible();
 
   await fellowPage.getByLabel(/Preferred name/).fill(fellowName);
   for (const label of [
@@ -59,9 +57,9 @@ test("AC-01: faculty invites; fellow onboards and sees the pinned curriculum", a
   await fellowPage.getByRole("button", { name: "Accept invitation and continue" }).click();
   await fellowPage.waitForURL(/\/t\/demo\/today/);
 
-  // Programme, supervisor and pinned curriculum version (DoD step 1).
+  // Programme and pinned curriculum version.
   await expect(fellowPage.getByText("Fellowship in Clinical AI — Cohort 5")).toBeVisible();
-  await expect(fellowPage.getByText("Sam Supervisor")).toBeVisible();
+  await expect(fellowPage.getByText(/Your diary is private/)).toBeVisible();
   await expect(fellowPage.getByText(/version 3\.2/)).toBeVisible();
 
   // Exactly 5 domains / 30 objectives from the pinned release.
@@ -80,7 +78,7 @@ test("AC-01: another tenant's URLs return not-found", async () => {
 test("AC-02: a reflection starts private with safety guidance", async () => {
   await fellowPage.goto("/t/demo/log/new");
   await fellowPage.getByLabel(/Title/).fill(`${CANARY} reflection`);
-  await fellowPage.getByLabel(/Evidence type/).selectOption({ label: "Reflection" });
+  await fellowPage.getByLabel(/Entry type/).selectOption({ label: "Reflection" });
 
   // Safety panel + first-save acknowledgement (FR-EV-008).
   await expect(fellowPage.getByText(/not a clinical record/)).toBeVisible();
@@ -98,11 +96,11 @@ test("AC-02: a reflection starts private with safety guidance", async () => {
   await fellowPage.waitForURL(/\/t\/demo\/log\/[0-9a-f-]+$/);
   evidenceUrl = fellowPage.url();
 
-  await expect(fellowPage.getByText("[DRAFT]")).toBeVisible();
-  await expect(fellowPage.getByText("Only me").first()).toBeVisible();
+  await expect(fellowPage.getByText("[PRIVATE DIARY]")).toBeVisible();
+  await expect(fellowPage.getByText(/visible only to you/i)).toBeVisible();
 });
 
-test("AC-02: the private reflection is invisible to the supervisor", async ({
+test("AC-02: staff cannot discover or read the private reflection", async ({
   browser,
   request,
 }) => {
@@ -113,17 +111,19 @@ test("AC-02: the private reflection is invisible to the supervisor", async ({
     "sam.supervisor@example.org",
   );
 
-  await supervisorPage.goto("/t/demo/supervisor/fellows");
-  const fellowLink = supervisorPage.getByRole("link", { name: fellowName });
-  await expect(fellowLink).toBeVisible();
-  await fellowLink.click();
-  await expect(supervisorPage.getByText("Nothing shared yet.")).toBeVisible();
-  expect(await supervisorPage.content()).not.toContain(CANARY);
-
-  // Direct URL probing returns the uniform not-found.
+  // There is no diary-list surface for staff. Direct page and API probing
+  // both return the uniform not-found without the canary.
+  const formerList = await supervisorPage.request.get("/t/demo/supervisor/fellows");
+  expect(formerList.status()).toBe(404);
   const directPage = await supervisorPage.request.get(evidenceUrl);
   expect(directPage.status()).toBe(404);
   expect(await directPage.text()).not.toContain(CANARY);
+  const evidenceId = evidenceUrl.split("/").pop();
+  const directApi = await supervisorPage.request.get(`/api/v1/diary-entries/${evidenceId}`, {
+    headers: { "x-tenant": "demo" },
+  });
+  expect(directApi.status()).toBe(404);
+  expect(await directApi.text()).not.toContain(CANARY);
 
   await supervisorContext.close();
 });
@@ -146,7 +146,7 @@ test("AC-03: map objectives; coverage counts the item without competence claims"
   const evidenceId = evidenceUrl.split("/").pop();
   await expect
     .poll(async () => {
-      const response = await fellowPage.request.get(`/api/v1/evidence/${evidenceId}`, {
+      const response = await fellowPage.request.get(`/api/v1/diary-entries/${evidenceId}`, {
         headers: { "x-tenant": "demo" },
       });
       const item = (await response.json()) as { objectiveIds?: string[] };
@@ -184,7 +184,7 @@ test("AC-04: concurrent saves surface the conflict; no silent overwrite", async 
 
   // Both bodies are recoverable: the losing words landed in revision history.
   const revisions = await tabB.request.get(
-    `/api/v1/evidence/${evidenceUrl.split("/").pop()}/revisions`,
+    `/api/v1/diary-entries/${evidenceUrl.split("/").pop()}/revisions`,
     { headers: { "x-tenant": "demo" } },
   );
   const body = (await revisions.json()) as { revisions: Array<{ changeReason: string }> };
@@ -205,41 +205,38 @@ test("AC-05: attach an HTTPS link with visible destination host", async () => {
   await expect(fellowPage.getByRole("link", { name: /Project notes repo/ })).toBeVisible();
 });
 
-test("Fellow deliberately shares with the supervisor after an audience preview", async ({
-  browser,
-  request,
-}) => {
-  // Complete the share-readiness fields first.
+test("The fellow can archive an entry without exposing or deleting it", async () => {
   await fellowPage.goto(evidenceUrl);
-  await fellowPage.getByLabel(/Delivery source/).selectOption({ label: "Workshop" });
-  await fellowPage.getByRole("button", { name: "Save draft" }).click();
-  await expect(fellowPage.getByText(/Saved \d/)).toBeVisible();
+  await fellowPage.getByRole("button", { name: "Archive entry" }).click();
+  await expect(fellowPage.getByText("[ARCHIVED]")).toBeVisible();
+  await expect(fellowPage.getByRole("button", { name: "Restore entry" })).toBeVisible();
+});
 
-  await fellowPage.getByRole("link", { name: "Preview audience and share" }).click();
-  await fellowPage.waitForURL(/\/share$/);
+test("The fellow downloads a complete ZIP, finishes read-only, then reopens", async () => {
+  await fellowPage.goto("/t/demo/diary-export");
+  await fellowPage.getByRole("button", { name: "Create complete export" }).click();
+  await expect(fellowPage.getByText("[EXPORT READY]")).toBeVisible({ timeout: 30_000 });
 
-  // The audience preview names the supervisor before anything changes.
-  // The radio's accessible name includes its description text.
-  await fellowPage
-    .getByRole("radio", { name: /^Me \+ supervisors Your currently assigned/ })
-    .check();
-  await expect(fellowPage.getByText(/Sam Supervisor \(primary supervisor\)/)).toBeVisible();
-  await fellowPage.getByRole("button", { name: "Share with supervisors" }).click();
-  await fellowPage.waitForURL(/\/t\/demo\/log\/[0-9a-f-]+$/);
-  await expect(fellowPage.getByText("[SHARED]")).toBeVisible();
+  const downloadHref = await fellowPage.getByRole("link", { name: "Download ZIP" }).getAttribute("href");
+  expect(downloadHref).toBeTruthy();
+  const download = await fellowPage.request.get(downloadHref!);
+  expect(download.status()).toBe(200);
+  expect((await download.body()).subarray(0, 2).toString("ascii")).toBe("PK");
 
-  // The supervisor now sees exactly this item.
-  const supervisorContext = await browser.newContext();
-  const supervisorPage = await signInViaMagicLink(
-    supervisorContext,
-    request,
-    "sam.supervisor@example.org",
-  );
-  await supervisorPage.goto("/t/demo/supervisor/fellows");
-  await supervisorPage.getByRole("link", { name: fellowName }).click();
-  await expect(supervisorPage.getByRole("link", { name: new RegExp(CANARY) })).toBeVisible();
-  await supervisorPage.getByRole("link", { name: new RegExp(CANARY) }).click();
-  await expect(supervisorPage.getByText("What this maps to")).toBeVisible();
-  await expect(supervisorPage.getByText("AF-01")).toBeVisible();
-  await supervisorContext.close();
+  await fellowPage.getByLabel(/Type FINISH MY DIARY/).fill("FINISH MY DIARY");
+  await fellowPage.getByRole("button", { name: "Finish my diary" }).click();
+  await expect(fellowPage.getByRole("heading", { name: "Diary finished" })).toBeVisible();
+
+  await fellowPage.goto("/t/demo/log");
+  await expect(fellowPage.getByText(/\[READ ONLY\]/)).toBeVisible();
+  await expect(fellowPage.getByRole("link", { name: "New entry" })).toHaveCount(0);
+
+  await fellowPage.goto("/t/demo/diary-export");
+  await fellowPage.getByLabel(/Type REOPEN MY DIARY/).fill("REOPEN MY DIARY");
+  await fellowPage.getByRole("button", { name: "Reopen my diary" }).click();
+  await expect(fellowPage.getByRole("heading", { name: "Finish diary" })).toBeVisible();
+
+  await fellowPage.goto(evidenceUrl);
+  await fellowPage.getByRole("button", { name: "Restore entry" }).click();
+  await expect(fellowPage.getByText("[PRIVATE DIARY]")).toBeVisible();
 });

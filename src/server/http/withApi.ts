@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { ZodType } from "zod";
+import { getEnv } from "@/server/config/env";
 import { getActor, type Actor } from "@/server/policy/actor";
 import { problem } from "./problem";
 
@@ -28,12 +29,48 @@ type Handler<TBody> = (
 
 const STATE_CHANGING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
+// JSON bodies are small documents (narratives are capped by the schemas);
+// anything larger is rejected before parsing so a client cannot make the
+// server buffer arbitrary payloads.
+const MAX_JSON_BODY_BYTES = 2 * 1024 * 1024;
+
+// Client-supplied request IDs are echoed into logs and response headers, so
+// only a conservative token is accepted; anything else gets a fresh UUID.
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
+export function requestIdFrom(request: NextRequest): string {
+  const supplied = request.headers.get("x-request-id");
+  return supplied && REQUEST_ID_PATTERN.test(supplied) ? supplied : randomUUID();
+}
+
+// Client IP for rate limiting. Only trusted when the deployment declares how
+// many reverse proxies sit in front of the app (TRUSTED_PROXY_HOPS); the
+// value at that depth is the one appended by our own proxy, so a client
+// cannot pick its own address. Returns null when nothing trustworthy exists.
+export function clientIpFrom(request: NextRequest): string | null {
+  const hops = getEnv().trustedProxyHops;
+  if (hops === 0) return null;
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (!forwardedFor) return null;
+  const chain = forwardedFor
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const candidate = chain[chain.length - hops];
+  return candidate && candidate.length <= 64 ? candidate : null;
+}
+
 function csrfSafe(request: NextRequest): boolean {
   if (!STATE_CHANGING.has(request.method)) return true;
   const origin = request.headers.get("origin");
   if (origin) {
-    const own = new URL(process.env.APP_BASE_URL ?? request.nextUrl.origin).origin;
-    return origin === own || origin === request.nextUrl.origin;
+    // Only the configured public origin is trusted. request.nextUrl.origin
+    // is derived from Host, which a misconfigured proxy could let a client
+    // set, so it is not an acceptable fallback in production.
+    const env = getEnv();
+    const own = new URL(env.APP_BASE_URL).origin;
+    if (origin === own) return true;
+    return !env.isProduction && origin === request.nextUrl.origin;
   }
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite) return fetchSite === "same-origin";
@@ -51,7 +88,7 @@ export function withApi<TBody = undefined>(
     request: NextRequest,
     routeContext: { params: Promise<Record<string, string>> },
   ): Promise<NextResponse> => {
-    const requestId = request.headers.get("x-request-id") ?? randomUUID();
+    const requestId = requestIdFrom(request);
     try {
       if (!csrfSafe(request)) {
         return problem("validation-failed", requestId, {
@@ -67,6 +104,12 @@ export function withApi<TBody = undefined>(
 
       let body = undefined as TBody;
       if (options.bodySchema) {
+        const declaredLength = Number(request.headers.get("content-length") ?? 0);
+        if (declaredLength > MAX_JSON_BODY_BYTES) {
+          return problem("validation-failed", requestId, {
+            detail: "Request body is too large.",
+          });
+        }
         let raw: unknown;
         try {
           raw = await request.json();

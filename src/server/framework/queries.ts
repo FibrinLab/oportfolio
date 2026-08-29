@@ -32,6 +32,9 @@ export async function loadEnrolmentContext(
       cohortId: enrolment.cohortId,
       programmeId: cohort.programmeId,
       frameworkReleaseId: enrolment.frameworkReleaseId,
+      diaryState: enrolment.diaryState,
+      diaryFinishCycle: enrolment.diaryFinishCycle,
+      diaryAccessEndsAt: enrolment.diaryAccessEndsAt,
     })
     .from(enrolment)
     .innerJoin(cohort, eq(enrolment.cohortId, cohort.id))
@@ -280,6 +283,9 @@ export async function getOwnEnrolment(
       cohortId: enrolment.cohortId,
       programmeId: cohort.programmeId,
       frameworkReleaseId: enrolment.frameworkReleaseId,
+      diaryState: enrolment.diaryState,
+      diaryFinishCycle: enrolment.diaryFinishCycle,
+      diaryAccessEndsAt: enrolment.diaryAccessEndsAt,
     })
     .from(enrolment)
     .innerJoin(cohort, eq(enrolment.cohortId, cohort.id))

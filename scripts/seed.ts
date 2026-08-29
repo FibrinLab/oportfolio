@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
+import { getEnv } from "@/server/config/env";
 import { getDb } from "@/server/db/client";
 import {
   appUser,
@@ -30,6 +31,14 @@ import { createInvitation } from "@/server/identity/invitations";
 const TENANT_SLUG = "demo";
 
 async function main() {
+  // Synthetic example.org accounts must never exist in a real deployment
+  // (spec/12: no shared or bypass credentials). getEnv() already refuses
+  // ALLOW_SEED in production; this guard covers NODE_ENV=production without it.
+  const env = getEnv();
+  if (env.isProduction && !env.ALLOW_SEED) {
+    console.error("Refusing to seed synthetic fixtures with NODE_ENV=production.");
+    process.exit(1);
+  }
   const db = getDb();
 
   const result = await db.transaction(async (tx) => {
@@ -265,7 +274,7 @@ async function main() {
         enrolmentId,
         createdBy: facultyId,
       });
-      const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+      const baseUrl = getEnv().APP_BASE_URL;
       inviteUrl = `${baseUrl}/invite/${token}`;
     }
 

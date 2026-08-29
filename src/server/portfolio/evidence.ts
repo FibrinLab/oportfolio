@@ -23,7 +23,6 @@ import {
   type Decision,
   type EnrolmentContext,
   type EvidenceContext,
-  type Visibility,
 } from "@/server/policy/policy";
 import { loadEnrolmentContext } from "@/server/framework/queries";
 import {
@@ -39,7 +38,7 @@ export interface EvidenceRow extends EvidenceContext {
   title: string;
   activityDate: string | null;
   activityEndedOn: string | null;
-  evidenceTypeId: string;
+  evidenceTypeId: string | null;
   narrativeDoc: NarrativeDoc;
   narrativeText: string;
   typeFieldsJson: Record<string, unknown> | null;
@@ -113,7 +112,7 @@ export async function getEvidenceWithAccess(
 export interface CreateEvidenceInput {
   title: string;
   activityDate?: string | null;
-  evidenceTypeId: string;
+  evidenceTypeId?: string | null;
   narrativeDoc?: unknown;
   reflectionAcknowledged?: boolean;
   requestId?: string | null;
@@ -142,7 +141,7 @@ export async function createEvidence(
       authorUserId: actor.userId,
       title: input.title,
       activityDate: input.activityDate ?? null,
-      evidenceTypeId: input.evidenceTypeId,
+      evidenceTypeId: input.evidenceTypeId ?? null,
       narrativeDoc: narrative.doc,
       narrativeText: narrative.plainText,
       // Private by default, always (ADR-002).
@@ -164,7 +163,7 @@ export async function createEvidence(
       targetId: id,
       enrolmentId: enrolment.id,
       requestId: input.requestId ?? null,
-      metadata: { evidenceTypeId: input.evidenceTypeId },
+      metadata: input.evidenceTypeId ? { evidenceTypeId: input.evidenceTypeId } : undefined,
     });
 
     // Reflection safety acknowledgement (FR-EV-008): a behavioral safeguard,
@@ -187,7 +186,7 @@ export interface UpdateEvidencePatch {
   title?: string;
   activityDate?: string | null;
   activityEndedOn?: string | null;
-  evidenceTypeId?: string;
+  evidenceTypeId?: string | null;
   narrativeDoc?: unknown;
   typeFieldsJson?: Record<string, unknown> | null;
   provenanceId?: string | null;
@@ -377,8 +376,6 @@ async function createRevision(
     narrativeDoc: item.narrativeDoc,
     typeFieldsJson: item.typeFieldsJson,
     provenanceId: item.provenanceId,
-    visibility: item.visibility,
-    workflowState: item.workflowState,
     objectiveIds: objectives.map((o) => o.objectiveId).sort(),
     dutyIds: duties.map((d) => d.dutyId).sort(),
   };
@@ -439,56 +436,6 @@ export async function createConflictBackup(
   return { ok: true };
 }
 
-// Visibility / share transition. Sharing is deliberate: the API layer shows
-// the audience preview; this records the change, snapshots, and audits it
-// (FR-EV-009, ADR-002).
-export async function changeVisibility(
-  actor: Actor,
-  access: EvidenceAccess,
-  newVisibility: Visibility,
-  requestId: string | null,
-): Promise<{ ok: true } | { ok: false; error: "denied" | "conflict" | "invalid" }> {
-  const { evidence, enrolment } = access;
-  const decision = canEditEvidence(actor, evidence, enrolment);
-  if (!decision.allow) return { ok: false, error: "denied" };
-
-  const db = getDb();
-  return db.transaction(async (tx) => {
-    const updated = await tx
-      .update(evidenceItem)
-      .set({
-        visibility: newVisibility,
-        workflowState: newVisibility === "private" ? "draft" : "shared",
-        updatedAt: new Date(),
-        updatedBy: actor.userId,
-        rowVersion: sql`${evidenceItem.rowVersion} + 1`,
-      })
-      .where(
-        and(eq(evidenceItem.id, evidence.id), eq(evidenceItem.tenantId, evidence.tenantId)),
-      )
-      .returning({ rowVersion: evidenceItem.rowVersion });
-    if (updated.length === 0) return { ok: false as const, error: "conflict" as const };
-
-    await createRevision(tx, {
-      evidenceItemId: evidence.id,
-      actorUserId: actor.userId,
-      changeReason: newVisibility === "private" ? "visibility_narrowed" : "shared",
-      changedFields: ["visibility", "workflow_state"],
-    });
-    await appendAudit(tx, {
-      tenantId: evidence.tenantId,
-      actorUserId: actor.userId,
-      action: newVisibility === "private" ? "evidence.visibility_changed" : "evidence.shared",
-      targetType: "evidence_item",
-      targetId: evidence.id,
-      enrolmentId: evidence.enrolmentId,
-      requestId,
-      metadata: { from: evidence.visibility, to: newVisibility },
-    });
-    return { ok: true as const };
-  });
-}
-
 export async function archiveEvidence(
   actor: Actor,
   access: EvidenceAccess,
@@ -497,10 +444,16 @@ export async function archiveEvidence(
   const decision = canEditEvidence(actor, access.evidence, access.enrolment);
   if (!decision.allow) return false;
   const db = getDb();
+  const changedAt = new Date();
   await db.transaction(async (tx) => {
     await tx
       .update(evidenceItem)
-      .set({ archivedAt: new Date(), updatedBy: actor.userId })
+      .set({
+        archivedAt: changedAt,
+        updatedAt: changedAt,
+        updatedBy: actor.userId,
+        rowVersion: sql`${evidenceItem.rowVersion} + 1`,
+      })
       .where(eq(evidenceItem.id, access.evidence.id));
     await appendAudit(tx, {
       tenantId: access.evidence.tenantId,
@@ -524,11 +477,20 @@ export async function restoreEvidence(
   // Restore applies to archived or grace-period-deleted items the author owns.
   if (evidence.authorUserId !== actor.userId) return false;
   if (!enrolment.fellowUserId || enrolment.fellowUserId !== actor.userId) return false;
+  if (enrolment.diaryState !== "open") return false;
   const db = getDb();
+  const changedAt = new Date();
   await db.transaction(async (tx) => {
     await tx
       .update(evidenceItem)
-      .set({ archivedAt: null, deletedAt: null, deletionDueAt: null, updatedBy: actor.userId })
+      .set({
+        archivedAt: null,
+        deletedAt: null,
+        deletionDueAt: null,
+        updatedAt: changedAt,
+        updatedBy: actor.userId,
+        rowVersion: sql`${evidenceItem.rowVersion} + 1`,
+      })
       .where(eq(evidenceItem.id, evidence.id));
     await appendAudit(tx, {
       tenantId: evidence.tenantId,
@@ -560,7 +522,9 @@ export async function softDeleteEvidence(
       .set({
         deletedAt: now,
         deletionDueAt: new Date(now.getTime() + DELETION_GRACE_DAYS * 24 * 60 * 60 * 1000),
+        updatedAt: now,
         updatedBy: actor.userId,
+        rowVersion: sql`${evidenceItem.rowVersion} + 1`,
       })
       .where(eq(evidenceItem.id, access.evidence.id));
     await appendAudit(tx, {
@@ -676,46 +640,20 @@ export async function setDuties(
   return { ok: true };
 }
 
-// List the evidence rows the actor may see for an enrolment. The visibility
-// predicate is shared between list and count queries so counts can never
-// disclose more than lists (spec/12; MILESTONES leak rule).
+// Diary lists are author-only. Keeping this predicate centralized prevents a
+// new list/count view from accidentally inheriting staff enrolment access.
 export function visibleEvidencePredicate(actor: Actor, enrolment: EnrolmentContext) {
   const isOwner = enrolment.fellowUserId === actor.userId;
   if (isOwner) {
     return and(eq(evidenceItem.enrolmentId, enrolment.id), isNull(evidenceItem.deletedAt));
   }
-  const isAssigned = actor.assignments.some((a) => a.enrolmentId === enrolment.id);
-  const visibilities: Visibility[] = [];
-  if (isAssigned) visibilities.push("supervisors", "faculty");
-  const isFaculty = actor.memberships.some(
-    (m) =>
-      m.tenantId === enrolment.tenantId &&
-      m.role === "faculty" &&
-      (m.scopeType === "tenant" ||
-        (m.scopeType === "programme" && m.scopeId === enrolment.programmeId) ||
-        (m.scopeType === "cohort" && m.scopeId === enrolment.cohortId)),
-  );
-  if (isFaculty && !visibilities.includes("faculty")) visibilities.push("faculty");
-  if (visibilities.length === 0) {
-    // No access: an always-false predicate.
-    return sql`false`;
-  }
-  return and(
-    eq(evidenceItem.enrolmentId, enrolment.id),
-    isNull(evidenceItem.deletedAt),
-    isNull(evidenceItem.archivedAt),
-    inArray(evidenceItem.visibility, visibilities),
-    // Non-owners never see drafts, whatever the visibility field says.
-    inArray(evidenceItem.workflowState, ["shared", "review_requested"]),
-  );
+  return sql`false`;
 }
 
 export interface EvidenceListRow {
   id: string;
   title: string;
   activityDate: string | null;
-  visibility: Visibility;
-  workflowState: string;
   archivedAt: Date | null;
   typeLabel: string;
   typeCode: string;
@@ -733,15 +671,13 @@ export async function listEvidence(
       id: evidenceItem.id,
       title: evidenceItem.title,
       activityDate: evidenceItem.activityDate,
-      visibility: evidenceItem.visibility,
-      workflowState: evidenceItem.workflowState,
       archivedAt: evidenceItem.archivedAt,
       typeLabel: evidenceType.label,
       typeCode: evidenceType.stableCode,
       updatedAt: evidenceItem.updatedAt,
     })
     .from(evidenceItem)
-    .innerJoin(evidenceType, eq(evidenceItem.evidenceTypeId, evidenceType.id))
+    .leftJoin(evidenceType, eq(evidenceItem.evidenceTypeId, evidenceType.id))
     .where(visibleEvidencePredicate(actor, enrolment))
     .orderBy(desc(evidenceItem.activityDate), desc(evidenceItem.createdAt));
 
@@ -763,7 +699,12 @@ export async function listEvidence(
     )
     .groupBy(evidenceObjective.evidenceItemId);
   const countById = new Map(counts.map((c) => [c.evidenceItemId, c.count]));
-  return rows.map((row) => ({ ...row, objectiveCount: countById.get(row.id) ?? 0 }));
+  return rows.map((row) => ({
+    ...row,
+    typeLabel: row.typeLabel ?? "Diary entry",
+    typeCode: row.typeCode ?? "entry",
+    objectiveCount: countById.get(row.id) ?? 0,
+  }));
 }
 
 // Reference data for the editor.

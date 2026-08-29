@@ -2,7 +2,7 @@
   "name": "oportfolio",
   "version": "0.1.0",
   "private": true,
-  "description": "Framework-driven learning portfolio for the NHS Fellowship in Clinical AI",
+  "description": "Independent private diary for personal learning and reflection",
   "packageManager": "pnpm@10.11.0",
   "engines": {
     "node": ">=22"
@@ -24,31 +24,38 @@
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:authz": "vitest run --project authz",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "audit:prod": "pnpm audit --prod --audit-level=high"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1108.0",
-    "@aws-sdk/s3-presigned-post": "^3.1108.0",
-    "@aws-sdk/s3-request-presigner": "^3.1108.0",
+    "@aws-sdk/client-s3": "^3.1120.0",
+    "@aws-sdk/lib-storage": "^3.1120.0",
+    "@aws-sdk/s3-presigned-post": "^3.1120.0",
+    "@aws-sdk/s3-request-presigner": "^3.1120.0",
     "@tiptap/extension-link": "^3.30.0",
     "@tiptap/pm": "^3.30.0",
     "@tiptap/react": "^3.30.0",
     "@tiptap/starter-kit": "^3.30.0",
+    "archiver": "^8.0.0",
     "drizzle-orm": "^0.45.2",
     "file-type": "^22.0.1",
     "next": "^16.3.0",
     "nodemailer": "^9.0.5",
+    "pdfkit": "^0.20.1",
     "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "tsx": "^4.23.12",
     "uuidv7": "^1.2.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
+    "@types/archiver": "^8.0.0",
     "@types/node": "^26.2.0",
     "@types/nodemailer": "^8.0.1",
+    "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.21.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -58,7 +65,6 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.0",
     "playwright": "^1.62.1",
-    "tsx": "^4.23.12",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }

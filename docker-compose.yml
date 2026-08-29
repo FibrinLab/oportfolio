@@ -44,8 +44,10 @@ services:
       mc alias set local http://minio:9000 oportfolio oportfolio_dev &&
       mc mb --ignore-existing local/oportfolio-quarantine &&
       mc mb --ignore-existing local/oportfolio-clean &&
+      mc mb --ignore-existing local/oportfolio-exports &&
       mc anonymous set none local/oportfolio-quarantine &&
-      mc anonymous set none local/oportfolio-clean
+      mc anonymous set none local/oportfolio-clean &&
+      mc anonymous set none local/oportfolio-exports
       "
 
   clamav:

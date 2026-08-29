@@ -64,12 +64,6 @@ export default async function InvitePage({
             </dd>
           </>
         ) : null}
-        {context.supervisorNames.length > 0 ? (
-          <>
-            <dt style={{ fontWeight: 700 }}>Supervisor</dt>
-            <dd>{context.supervisorNames.join(", ")}</dd>
-          </>
-        ) : null}
       </dl>
 
       <div
@@ -83,8 +77,9 @@ export default async function InvitePage({
       >
         <p style={{ fontWeight: 700 }}>PRIVACY</p>
         <p>
-          Your portfolio entries and reflections start private to you. Sharing with your
-          supervisor or faculty is always an explicit choice, shown before you confirm it.
+          Your diary entries and reflections are visible only to you. Programme staff can
+          administer your account, programme and enrolment, but cannot read diary titles,
+          dates, links, files or reflections.
         </p>
       </div>
 
@@ -99,7 +94,7 @@ export default async function InvitePage({
       >
         <p style={{ fontWeight: 700 }}>WARNING</p>
         <p>
-          oPortfolio is not a clinical record. Do not enter patient-identifiable data —
+          This diary is not a clinical record. Do not enter patient-identifiable data —
           names, dates of birth, NHS numbers, images, or rare combinations of facts that
           could identify a patient, colleague or third party.
         </p>

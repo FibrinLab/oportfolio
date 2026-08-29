@@ -59,7 +59,7 @@ export function FilesAndLinks({
     }
     const interval = setInterval(async () => {
       const result = await api<{ attachments: FileRow[] }>(
-        `/api/v1/evidence/${evidenceId}/attachments`,
+        `/api/v1/diary-entries/${evidenceId}/attachments`,
         { tenantSlug },
       );
       if (result.ok) setFiles(result.data.attachments);
@@ -81,7 +81,7 @@ export function FilesAndLinks({
         method: "POST",
         tenantSlug,
         body: {
-          evidenceId,
+          entryId: evidenceId,
           filename: file.name,
           mediaTypeClaimed: file.type || "application/octet-stream",
           sizeBytes: file.size,
@@ -139,7 +139,7 @@ export function FilesAndLinks({
     event.preventDefault();
     setLinkError(null);
     const result = await api<{ id: string; host: string }>(
-      `/api/v1/evidence/${evidenceId}/links`,
+      `/api/v1/diary-entries/${evidenceId}/links`,
       {
         method: "POST",
         tenantSlug,
@@ -159,7 +159,7 @@ export function FilesAndLinks({
   }
 
   async function onRemoveLink(linkId: string) {
-    const result = await api(`/api/v1/evidence/${evidenceId}/links`, {
+    const result = await api(`/api/v1/diary-entries/${evidenceId}/links`, {
       method: "DELETE",
       tenantSlug,
       body: { linkId },
@@ -236,7 +236,7 @@ export function FilesAndLinks({
         </button>
         <p className={forms.hint} style={{ marginTop: "var(--space-2)" }}>
           Up to 10 files, 25 MB each. PDF, PNG, JPEG, plain text, Markdown, CSV, DOCX, PPTX.
-          Files are checked before anyone else can open them.
+          Files are safety-checked before they can be opened or included in an export.
         </p>
         {uploadError ? (
           <p role="alert" className={forms.error}>

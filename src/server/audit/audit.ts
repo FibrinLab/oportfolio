@@ -12,6 +12,7 @@ import { computeEventHash, GENESIS_HASH } from "./hashChain";
 // narrative content, comment text, filenames or secrets (spec/05).
 
 export type AuditAction =
+  | "auth.sign_up"
   | "auth.sign_in"
   | "auth.sign_in_failed"
   | "auth.sign_out"
@@ -29,8 +30,6 @@ export type AuditAction =
   | "framework.published"
   | "evidence.created"
   | "evidence.updated"
-  | "evidence.visibility_changed"
-  | "evidence.shared"
   | "evidence.archived"
   | "evidence.restored"
   | "evidence.deleted"
@@ -42,6 +41,15 @@ export type AuditAction =
   | "attachment.deleted"
   | "link.added"
   | "link.removed"
+  | "diary.finished"
+  | "diary.reopened"
+  | "diary.purged"
+  | "export.requested"
+  | "export.completed"
+  | "export.failed"
+  | "export.download_issued"
+  | "retention_hold.placed"
+  | "retention_hold.released"
   | "notice.acknowledged";
 
 export interface AuditInput {

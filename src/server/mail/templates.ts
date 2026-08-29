@@ -13,9 +13,9 @@ export function renderTemplate(
   switch (template) {
     case "magic_link":
       return {
-        subject: "Your oPortfolio sign-in link",
+        subject: "Your oPortfolio access link",
         text: [
-          "Use this link to sign in to oPortfolio:",
+          "Use this link to sign in or create your private oPortfolio diary:",
           "",
           variables.verifyUrl ?? "",
           "",
@@ -27,13 +27,35 @@ export function renderTemplate(
       return {
         subject: "You have been invited to oPortfolio",
         text: [
-          "You have been invited to join oPortfolio, the learning portfolio for the NHS Fellowship in Clinical AI.",
+          "You have been invited to join oPortfolio, the private reflective diary for the NHS Fellowship in Clinical AI.",
           "",
           "Accept your invitation:",
           variables.inviteUrl ?? "",
           "",
           `The invitation expires in ${variables.expiryDays ?? "7"} days.`,
           "If you were not expecting this, contact your programme team.",
+        ].join("\n"),
+      };
+    case "diary_export_ready":
+      return {
+        subject: "Your diary export is ready",
+        text: [
+          "Your private diary export is ready.",
+          "",
+          `Sign in to download it: ${variables.appUrl ?? ""}`,
+          "",
+          "The message contains no diary content. Keep the downloaded archive secure.",
+        ].join("\n"),
+      };
+    case "diary_deletion_reminder":
+      return {
+        subject: `Your diary will be deleted in ${variables.daysRemaining ?? "a few"} day(s)`,
+        text: [
+          `Your finished diary is scheduled for deletion in ${variables.daysRemaining ?? "a few"} day(s).`,
+          "",
+          `Sign in to download it or reopen the diary: ${variables.appUrl ?? ""}`,
+          "",
+          "This message contains no diary content.",
         ].join("\n"),
       };
     default:

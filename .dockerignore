@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.pnpm-store
+node_modules
+test-results
+playwright-report
+coverage
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+spec/**/*.pdf

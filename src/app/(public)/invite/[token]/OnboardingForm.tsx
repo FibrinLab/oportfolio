@@ -211,7 +211,7 @@ export function OnboardingForm({
           marginTop: "var(--space-4)",
         }}
       >
-        {submitting ? "Setting up your portfolio…" : "Accept invitation and continue"}
+        {submitting ? "Setting up your diary…" : "Accept invitation and continue"}
       </button>
     </form>
   );

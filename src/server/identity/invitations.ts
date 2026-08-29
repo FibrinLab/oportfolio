@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
+import { getEnv } from "@/server/config/env";
 import type { Db } from "@/server/db/client";
 import {
   appUser,
@@ -44,7 +45,7 @@ export async function createInvitation(
     expiresAt: new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
     createdBy: input.createdBy,
   });
-  const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+  const baseUrl = getEnv().APP_BASE_URL;
   await enqueue(tx, "send_email", {
     to: email,
     template: "invitation",

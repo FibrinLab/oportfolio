@@ -1,5 +1,6 @@
 # dependencies
 node_modules/
+.pnpm-store/
 
 # next.js
 .next/
@@ -23,6 +24,8 @@ blob-report/
 
 # misc
 .DS_Store
+.env.production
+.env.production.local
 *.pem
 *.log
 *.tsbuildinfo

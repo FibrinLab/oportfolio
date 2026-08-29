@@ -7,7 +7,13 @@ import { outboxMessage } from "@/server/db/schema";
 // change that requires them (NFR-S-004, NFR-A-004); the worker claims with
 // FOR UPDATE SKIP LOCKED and marks done or retries with backoff.
 
-export type OutboxTopic = "send_email" | "scan_attachment";
+export type OutboxTopic =
+  | "send_email"
+  | "scan_attachment"
+  | "generate_diary_export"
+  | "expire_diary_export"
+  | "diary_reminder"
+  | "purge_diary";
 
 export interface OutboxPayloads {
   send_email: {
@@ -19,6 +25,21 @@ export interface OutboxPayloads {
   scan_attachment: {
     attachmentId: string;
     tenantId: string;
+  };
+  generate_diary_export: {
+    exportJobId: string;
+  };
+  expire_diary_export: {
+    exportJobId: string;
+  };
+  diary_reminder: {
+    enrolmentId: string;
+    finishCycle: number;
+    kind: "thirty_days" | "seven_days" | "one_day";
+  };
+  purge_diary: {
+    enrolmentId: string;
+    finishCycle: number;
   };
 }
 

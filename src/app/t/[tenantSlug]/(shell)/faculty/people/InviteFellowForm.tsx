@@ -22,16 +22,13 @@ const labelStyle: React.CSSProperties = {
 export function InviteFellowForm({
   tenantId,
   cohorts,
-  supervisors,
 }: {
   tenantId: string;
   cohorts: Array<{ id: string; name: string; programmeName: string }>;
-  supervisors: Array<{ userId: string; displayName: string }>;
 }) {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [cohortId, setCohortId] = useState(cohorts[0]?.id ?? "");
-  const [supervisorUserId, setSupervisorUserId] = useState(supervisors[0]?.userId ?? "");
   const [status, setStatus] = useState<"idle" | "submitting" | "sent" | "error">("idle");
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
@@ -52,7 +49,6 @@ export function InviteFellowForm({
           displayName,
           role: "fellow",
           cohortId,
-          primarySupervisorUserId: supervisorUserId || undefined,
         }),
       });
       if (!response.ok) {
@@ -107,23 +103,6 @@ export function InviteFellowForm({
         {cohorts.map((c) => (
           <option key={c.id} value={c.id}>
             {c.programmeName} — {c.name}
-          </option>
-        ))}
-      </select>
-
-      <label htmlFor="invite-supervisor" style={labelStyle}>
-        Primary supervisor
-      </label>
-      <select
-        id="invite-supervisor"
-        value={supervisorUserId}
-        onChange={(e) => setSupervisorUserId(e.target.value)}
-        style={{ ...inputStyle, appearance: "auto" }}
-      >
-        <option value="">Assign later</option>
-        {supervisors.map((s) => (
-          <option key={s.userId} value={s.userId}>
-            {s.displayName}
           </option>
         ))}
       </select>

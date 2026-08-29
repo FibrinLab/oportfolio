@@ -1,8 +1,8 @@
 import type { Actor } from "./actor";
 
 // Pure, synchronous policy functions over already-loaded rows. Default deny:
-// every decision combines tenant membership + scoped role + active dated
-// assignment + ownership + workflow state + visibility (spec/01, spec/12).
+// every decision combines tenant membership, scope, ownership and lifecycle
+// state. Diary content has no staff audience.
 //
 // Deny reasons are for audit/reason codes only — object-read denials render
 // as a uniform 404 so existence never leaks.
@@ -29,6 +29,9 @@ export interface EnrolmentContext {
   fellowUserId: string | null;
   programmeId: string;
   cohortId: string;
+  diaryState: "open" | "finished" | "purged";
+  diaryFinishCycle: number;
+  diaryAccessEndsAt: Date | null;
 }
 
 export interface EvidenceContext {
@@ -52,10 +55,6 @@ function hasRole(actor: Actor, tenantId: string, role: ActorRole): boolean {
 
 type ActorRole = "fellow" | "supervisor" | "faculty" | "tenant_admin";
 
-function isAssignedSupervisor(actor: Actor, enrolmentId: string): boolean {
-  return actor.assignments.some((a) => a.enrolmentId === enrolmentId);
-}
-
 // Faculty scope: tenant-wide faculty membership, or programme/cohort-scoped
 // membership matching this enrolment's programme/cohort.
 function hasFacultyScope(actor: Actor, enrolment: EnrolmentContext): boolean {
@@ -76,13 +75,17 @@ export function isOwnEnrolment(actor: Actor, enrolment: EnrolmentContext): boole
 export function canReadEnrolment(actor: Actor, enrolment: EnrolmentContext): Decision {
   if (!hasTenantMembership(actor, enrolment.tenantId)) return deny("no_tenant_membership");
   if (isOwnEnrolment(actor, enrolment)) return allow;
-  if (isAssignedSupervisor(actor, enrolment.id)) return allow;
+  if (hasRole(actor, enrolment.tenantId, "tenant_admin")) return allow;
   if (hasFacultyScope(actor, enrolment)) return allow;
-  return deny("not_assigned");
+  return deny("no_role");
 }
 
-// The pinned curriculum is readable by anyone who can read the enrolment.
-export const canReadCurriculum = canReadEnrolment;
+// The curriculum is part of the fellow's private diary context. Programme
+// staff manage framework metadata elsewhere but never enter a fellow diary.
+export function canReadCurriculum(actor: Actor, enrolment: EnrolmentContext): Decision {
+  if (!hasTenantMembership(actor, enrolment.tenantId)) return deny("no_tenant_membership");
+  return isOwnEnrolment(actor, enrolment) ? allow : deny("not_owner");
+}
 
 export function canReadEvidence(
   actor: Actor,
@@ -93,21 +96,13 @@ export function canReadEvidence(
   if (evidence.tenantId !== enrolment.tenantId || evidence.enrolmentId !== enrolment.id) {
     return deny("not_visible");
   }
-  if (evidence.deletedAt) {
-    // The author retains grace-period access to restore; nobody else reads it.
-    return evidence.authorUserId === actor.userId ? allow : deny("deleted");
+  // Diary content is author-only. Roles and assignments deliberately have no
+  // effect here, including for archived and grace-period-deleted entries.
+  if (evidence.authorUserId !== actor.userId || !isOwnEnrolment(actor, enrolment)) {
+    return deny("not_owner");
   }
-  if (evidence.authorUserId === actor.userId) return allow;
-
-  // Non-authors never see private content, whatever their role (spec/01).
-  if (evidence.visibility === "private") return deny("not_visible");
-  if (evidence.visibility === "supervisors") {
-    return isAssignedSupervisor(actor, enrolment.id) ? allow : deny("not_visible");
-  }
-  // faculty visibility: assigned supervisors and scoped faculty.
-  if (isAssignedSupervisor(actor, enrolment.id)) return allow;
-  if (hasFacultyScope(actor, enrolment)) return allow;
-  return deny("not_visible");
+  if (enrolment.diaryState === "purged") return deny("deleted");
+  return allow;
 }
 
 export function canEditEvidence(
@@ -116,21 +111,35 @@ export function canEditEvidence(
   enrolment: EnrolmentContext,
 ): Decision {
   if (!hasTenantMembership(actor, evidence.tenantId)) return deny("no_tenant_membership");
-  // Only the author fellow edits their evidence — supervisors comment, they
-  // never edit fellow-authored work (FR-EV-011).
+  // Only the author fellow can edit their diary.
   if (evidence.authorUserId !== actor.userId) return deny("not_owner");
   if (!isOwnEnrolment(actor, enrolment)) return deny("not_owner");
+  if (enrolment.diaryState !== "open") return deny("wrong_state");
   if (evidence.deletedAt) return deny("deleted");
   if (evidence.archivedAt) return deny("wrong_state");
   return allow;
 }
 
-export const canShareEvidence = canEditEvidence;
 export const canDeleteEvidence = canEditEvidence;
 
 export function canCreateEvidence(actor: Actor, enrolment: EnrolmentContext): Decision {
   if (!hasTenantMembership(actor, enrolment.tenantId)) return deny("no_tenant_membership");
   if (!isOwnEnrolment(actor, enrolment)) return deny("not_owner");
+  if (enrolment.diaryState !== "open") return deny("wrong_state");
+  return allow;
+}
+
+export function canExportDiary(actor: Actor, enrolment: EnrolmentContext): Decision {
+  if (!hasTenantMembership(actor, enrolment.tenantId)) return deny("no_tenant_membership");
+  if (!isOwnEnrolment(actor, enrolment)) return deny("not_owner");
+  if (enrolment.diaryState === "purged") return deny("deleted");
+  if (
+    enrolment.diaryState === "finished" &&
+    enrolment.diaryAccessEndsAt &&
+    enrolment.diaryAccessEndsAt.getTime() <= Date.now()
+  ) {
+    return deny("wrong_state");
+  }
   return allow;
 }
 
@@ -141,8 +150,7 @@ export interface AttachmentContext {
   deletedAt: Date | null;
 }
 
-// Attachments inherit their parent's visibility exactly in MVP (spec/05):
-// the caller passes the parent evidence decision.
+// Attachments inherit their owner-only parent decision.
 export function canDownloadAttachment(
   attachment: AttachmentContext,
   parentDecision: Decision,

@@ -42,6 +42,11 @@ test("axe: sign-in page", async ({ page }) => {
   await expectNoSeriousViolations(page, "sign-in");
 });
 
+test("axe: about page", async ({ page }) => {
+  await page.goto("/about");
+  await expectNoSeriousViolations(page, "about");
+});
+
 test("axe: today page", async () => {
   await fellowPage.goto("/t/demo/today");
   await expectNoSeriousViolations(fellowPage, "today");

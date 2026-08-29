@@ -1,0 +1,103 @@
+# Reference production topology — web + worker built from this repository,
+# with a one-shot migration step. Postgres, S3-compatible storage, ClamAV and
+# SMTP are expected to be managed services (or hardened deployments) reachable
+# from these containers; none of the development defaults apply.
+#
+#   cp .env.example .env.production   # then fill in every value
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Terminate TLS in front of `web` (reverse proxy / load balancer) and set
+# TRUSTED_PROXY_HOPS to the number of proxies in that chain. Full guidance and
+# the go-live checklist: docs/deployment.md.
+
+name: oportfolio-prod
+
+x-app-env: &app-env
+  NODE_ENV: production
+  APP_BASE_URL: ${APP_BASE_URL:?set APP_BASE_URL (https origin)}
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+  S3_ENDPOINT: ${S3_ENDPOINT:?set S3_ENDPOINT}
+  S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
+  S3_REGION: ${S3_REGION:-eu-west-2}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+  S3_BUCKET_QUARANTINE: ${S3_BUCKET_QUARANTINE:-oportfolio-quarantine}
+  S3_BUCKET_CLEAN: ${S3_BUCKET_CLEAN:-oportfolio-clean}
+  S3_BUCKET_EXPORT: ${S3_BUCKET_EXPORT:-oportfolio-exports}
+  CLAMD_HOST: ${CLAMD_HOST:-clamav}
+  CLAMD_PORT: ${CLAMD_PORT:-3310}
+  SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  SMTP_FROM: ${SMTP_FROM:?set SMTP_FROM}
+  TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
+  SECURITY_CONTACT: ${SECURITY_CONTACT:-}
+  SECURITY_POLICY_URL: ${SECURITY_POLICY_URL:-}
+
+services:
+  migrate:
+    build:
+      context: .
+      target: worker
+    environment: *app-env
+    command: ["node_modules/.bin/tsx", "scripts/migrate.ts"]
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      target: web
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:3000:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  worker:
+    build:
+      context: .
+      target: worker
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  # ClamAV is stateful (signature database) and safe to co-locate; it must not
+  # be exposed beyond the compose network.
+  clamav:
+    image: clamav/clamav-debian:1.4
+    volumes:
+      - clamdb:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    restart: unless-stopped
+
+volumes:
+  clamdb:

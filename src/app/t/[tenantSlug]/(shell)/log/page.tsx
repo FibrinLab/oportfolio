@@ -6,13 +6,7 @@ import { getOwnEnrolment } from "@/server/framework/queries";
 import { listEvidence } from "@/server/portfolio/evidence";
 import { formatDateUk } from "@/lib/dates";
 
-export const metadata: Metadata = { title: "Log" };
-
-const AUDIENCE_LABEL: Record<string, string> = {
-  private: "Only me",
-  supervisors: "Me + supervisors",
-  faculty: "Me + supervisors + faculty",
-};
+export const metadata: Metadata = { title: "Diary" };
 
 export default async function LogPage({
   params,
@@ -52,29 +46,37 @@ export default async function LogPage({
         }}
       >
         <h1>
-          Log{" "}
+          Diary{" "}
           <span style={{ fontWeight: 400, fontSize: "var(--text-body)" }}>
             ({items.length} {items.length === 1 ? "entry" : "entries"})
           </span>
         </h1>
-        <Link
-          href={`/t/${tenantSlug}/log/new`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: "var(--target-min)",
-            padding: "0 var(--space-5)",
-            background: "var(--ink)",
-            color: "var(--paper)",
-            border: "2px solid var(--ink)",
-            borderRadius: "var(--radius-control)",
-            fontWeight: 700,
-            textDecoration: "none",
-          }}
-        >
-          New entry
-        </Link>
+        {enrolment.diaryState === "open" ? (
+          <Link
+            href={`/t/${tenantSlug}/log/new`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: "var(--target-min)",
+              padding: "0 var(--space-5)",
+              background: "var(--ink)",
+              color: "var(--paper)",
+              border: "2px solid var(--ink)",
+              borderRadius: "var(--radius-control)",
+              fontWeight: 700,
+              textDecoration: "none",
+            }}
+          >
+            New entry
+          </Link>
+        ) : null}
       </div>
+
+      {enrolment.diaryState === "finished" ? (
+        <p className="stamp" style={{ marginBottom: "var(--space-4)" }}>
+          [READ ONLY] This diary is finished. Use Export to download or reopen it.
+        </p>
+      ) : null}
 
       {items.length === 0 ? (
         <div
@@ -124,15 +126,14 @@ export default async function LogPage({
                     </Link>
                     <span style={{ display: "block", fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
                       {item.activityDate ? `${formatDateUk(item.activityDate)} · ` : ""}
-                      {item.typeLabel} · {item.objectiveCount} objective
-                      {item.objectiveCount === 1 ? "" : "s"} mapped
+                      {item.typeLabel}
+                      {item.objectiveCount > 0
+                        ? ` · ${item.objectiveCount} objective${item.objectiveCount === 1 ? "" : "s"} mapped`
+                        : ""}
                     </span>
                   </span>
                   <span style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
-                    <span className="stamp">
-                      [{item.archivedAt ? "ARCHIVED" : item.workflowState === "shared" ? "SHARED" : "DRAFT"}]
-                    </span>{" "}
-                    {AUDIENCE_LABEL[item.visibility]}
+                    <span className="stamp">[{item.archivedAt ? "ARCHIVED" : "PRIVATE"}]</span>
                   </span>
                 </li>
               ))}

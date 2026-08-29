@@ -45,7 +45,7 @@ export function AppShell({
           </button>
         </div>
         <p className={styles.context}>
-          {tenantName} / {roleLabel}
+          {tenantName}{roleLabel ? ` / ${roleLabel}` : ""}
         </p>
         <nav id="shell-nav" className={styles.nav} aria-label="Primary" data-open={menuOpen}>
           {navItems.map((item) => {

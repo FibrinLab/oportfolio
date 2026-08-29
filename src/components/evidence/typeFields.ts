@@ -83,7 +83,7 @@ export const TYPE_FIELDS: Record<string, TypeFieldDef[]> = {
 };
 
 export const REFLECTION_SAFETY_TEXT =
-  "Focus on what you learned and what you will do differently. Do not include names, dates of birth, NHS numbers, images, rare combinations of facts, or other details that could identify a patient, colleague or third party. This portfolio is not a clinical record or incident-reporting system. Reflective notes can be subject to lawful disclosure; choose your audience deliberately.";
+  "Focus on what you learned and what you will do differently. Do not include names, dates of birth, NHS numbers, images, rare combinations of facts, or other details that could identify a patient, colleague or third party. This diary is not a clinical record or incident-reporting system. Reflective notes can be subject to lawful disclosure, so write only what belongs in your private learning record.";
 
 export const REFLECTION_ACK_LABEL =
   "I have removed identifiable patient and third-party details.";

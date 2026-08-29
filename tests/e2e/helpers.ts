@@ -38,13 +38,13 @@ export async function signInViaMagicLink(
   const beforeId = await newestMessageId(request, email);
   await page.goto("/sign-in");
   await page.getByLabel("Email address").fill(email);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Continue with email" }).click();
   await page.getByRole("status").waitFor();
 
   const link = await latestEmailLink(
     request,
     email,
-    /http:\/\/localhost:3000\/auth\/verify\?token=[\w-]+/,
+    /https?:\/\/localhost:\d+\/auth\/verify\?token=[\w-]+/,
     beforeId,
   );
   await page.goto(link);

@@ -7,7 +7,6 @@ import { domain, noticeAcknowledgement, objective } from "@/server/db/schema";
 import { getActor, resolveTenant } from "@/server/policy/actor";
 import { canEditEvidence } from "@/server/policy/policy";
 import {
-  getActiveDutyIds,
   getActiveObjectiveIds,
   getEvidenceWithAccess,
   listRevisions,
@@ -17,16 +16,11 @@ import { renderNarrativeHtml } from "@/server/portfolio/narrativeDoc";
 import { listAttachments } from "@/server/files/attachments";
 import { listLinks } from "@/server/portfolio/links";
 import { EvidenceEditor } from "@/components/evidence/EvidenceEditor";
+import { DiaryEntryActions } from "@/components/evidence/DiaryEntryActions";
 import { formatDateUk, formatDateTimeUk } from "@/lib/dates";
 
 // Neutral title only — no portfolio content in the browser tab (spec/02).
-export const metadata: Metadata = { title: "Evidence item" };
-
-const AUDIENCE_LABEL: Record<string, string> = {
-  private: "Only me",
-  supervisors: "Me + supervisors",
-  faculty: "Me + supervisors + faculty",
-};
+export const metadata: Metadata = { title: "Diary entry" };
 
 export default async function EvidencePage({
   params,
@@ -48,9 +42,8 @@ export default async function EvidencePage({
   if (editable) {
     const context = await getEditorContext(actor, tenantContext.tenantId);
     if (!context) notFound();
-    const [objectiveIds, dutyIds, priorReflectionAck, files, links] = await Promise.all([
+    const [objectiveIds, priorReflectionAck, files, links] = await Promise.all([
       getActiveObjectiveIds(evidence.id),
-      getActiveDutyIds(evidence.id),
       getDb()
         .select({ id: noticeAcknowledgement.id })
         .from(noticeAcknowledgement)
@@ -75,12 +68,7 @@ export default async function EvidencePage({
           activityDate: evidence.activityDate,
           evidenceTypeId: evidence.evidenceTypeId,
           narrativeDoc: evidence.narrativeDoc,
-          typeFieldsJson: evidence.typeFieldsJson,
-          provenanceId: evidence.provenanceId,
-          visibility: evidence.visibility,
-          workflowState: evidence.workflowState,
           objectiveIds,
-          dutyIds,
           rowVersion: evidence.rowVersion,
         }}
         options={context.options}
@@ -93,7 +81,7 @@ export default async function EvidencePage({
     );
   }
 
-  // Read-only detail (supervisor/faculty view; or archived items).
+  // Read-only detail for the owner when the entry is archived or the diary is finished.
   const objectiveIds = await getActiveObjectiveIds(evidence.id);
   const db = getDb();
   const mappedObjectives = objectiveIds.length
@@ -120,18 +108,21 @@ export default async function EvidencePage({
   return (
     <article style={{ maxWidth: "var(--measure)" }}>
       <nav aria-label="Breadcrumb" style={{ marginBottom: "var(--space-4)", fontSize: "var(--text-sm)" }}>
-        <Link href={`/t/${tenantSlug}/supervisor/fellows/${enrolment.id}`}>Back to fellow</Link>
+        <Link href={`/t/${tenantSlug}/log`}>Back to diary</Link>
       </nav>
 
       <p className="stamp" style={{ marginBottom: "var(--space-2)" }}>
-        [{evidence.workflowState === "shared" ? "SHARED" : evidence.workflowState.toUpperCase()}] ·{" "}
-        {AUDIENCE_LABEL[evidence.visibility]}
+        [{evidence.deletedAt ? "DELETED — RECOVERABLE" : evidence.archivedAt ? "ARCHIVED" : "PRIVATE DIARY"}]
       </p>
       <h1 style={{ marginBottom: "var(--space-2)" }}>{evidence.title}</h1>
       <p style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)", marginBottom: "var(--space-5)" }}>
         {evidence.activityDate ? `Activity ${formatDateUk(evidence.activityDate)} · ` : ""}
         Last updated {formatDateTimeUk(evidence.updatedAt)}
       </p>
+
+      {enrolment.diaryState === "open" && (evidence.archivedAt || evidence.deletedAt) ? (
+        <DiaryEntryActions tenantSlug={tenantSlug} entryId={evidence.id} mode="recoverable" />
+      ) : null}
 
       <section
         aria-label="Evidence content"
@@ -160,7 +151,7 @@ export default async function EvidencePage({
           </ul>
         )}
         <p style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)", marginTop: "var(--space-2)" }}>
-          Mapped evidence is a count and review aid, not proof of competence.
+          Curriculum links are optional organisational aids, not proof of competence.
         </p>
       </section>
 
