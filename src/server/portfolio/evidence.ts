@@ -26,9 +26,19 @@ import {
 } from "@/server/policy/policy";
 import { loadEnrolmentContext } from "@/server/framework/queries";
 import {
+  emptyNarrativeDoc,
   validateNarrativeDoc,
   type NarrativeDoc,
 } from "./narrativeDoc";
+import type { Envelope } from "@/lib/crypto/envelope";
+
+// End-to-end encrypted content (ADR-007): the server stores these envelopes
+// and never has a key that opens them. When `encrypted` is true the
+// plaintext columns are empty (database CHECK constraint).
+export interface ContentEnc {
+  title: Envelope;
+  narrative: Envelope;
+}
 
 // Evidence services: the single mutation path for evidence rows. Every write
 // happens in a transaction that also appends audit; revisions are append-only
@@ -41,6 +51,8 @@ export interface EvidenceRow extends EvidenceContext {
   evidenceTypeId: string | null;
   narrativeDoc: NarrativeDoc;
   narrativeText: string;
+  encrypted: boolean;
+  contentEnc: ContentEnc | null;
   typeFieldsJson: Record<string, unknown> | null;
   provenanceId: string | null;
   reviewRequestedAt: Date | null;
@@ -79,6 +91,8 @@ export async function loadEvidence(
     evidenceTypeId: row.evidenceTypeId,
     narrativeDoc: row.narrativeDoc as NarrativeDoc,
     narrativeText: row.narrativeText,
+    encrypted: row.encrypted,
+    contentEnc: (row.contentEnc as ContentEnc | null) ?? null,
     typeFieldsJson: (row.typeFieldsJson as Record<string, unknown> | null) ?? null,
     provenanceId: row.provenanceId,
     reviewRequestedAt: row.reviewRequestedAt,
@@ -110,10 +124,12 @@ export async function getEvidenceWithAccess(
 }
 
 export interface CreateEvidenceInput {
-  title: string;
+  id?: string;
+  title?: string;
   activityDate?: string | null;
   evidenceTypeId?: string | null;
   narrativeDoc?: unknown;
+  contentEnc?: ContentEnc;
   reflectionAcknowledged?: boolean;
   requestId?: string | null;
 }
@@ -126,24 +142,34 @@ export async function createEvidence(
   const decision = canCreateEvidence(actor, enrolment);
   if (!decision.allow) return { error: "denied" };
 
+  // Sealed entries carry no plaintext at all; plaintext entries need a title.
+  const sealed = input.contentEnc ?? null;
+  if (sealed && (input.title || input.narrativeDoc !== undefined)) {
+    return { error: "invalid", issues: ["A sealed entry cannot also carry plaintext."] };
+  }
+  if (!sealed && !input.title?.trim()) {
+    return { error: "invalid", issues: ["Title is required."] };
+  }
   const narrative = validateNarrativeDoc(
-    input.narrativeDoc ?? { type: "doc", content: [{ type: "paragraph" }] },
+    sealed ? emptyNarrativeDoc() : (input.narrativeDoc ?? { type: "doc", content: [{ type: "paragraph" }] }),
   );
   if (!narrative.valid || !narrative.doc) return { error: "invalid", issues: narrative.issues };
 
   const db = getDb();
-  const id = uuidv7();
+  const id = input.id ?? uuidv7();
   await db.transaction(async (tx) => {
     await tx.insert(evidenceItem).values({
       id,
       tenantId: enrolment.tenantId,
       enrolmentId: enrolment.id,
       authorUserId: actor.userId,
-      title: input.title,
+      title: sealed ? "" : input.title!.trim(),
       activityDate: input.activityDate ?? null,
       evidenceTypeId: input.evidenceTypeId ?? null,
       narrativeDoc: narrative.doc,
-      narrativeText: narrative.plainText,
+      narrativeText: sealed ? "" : narrative.plainText,
+      encrypted: Boolean(sealed),
+      contentEnc: sealed,
       // Private by default, always (ADR-002).
       visibility: "private",
       workflowState: "draft",
@@ -163,7 +189,10 @@ export async function createEvidence(
       targetId: id,
       enrolmentId: enrolment.id,
       requestId: input.requestId ?? null,
-      metadata: input.evidenceTypeId ? { evidenceTypeId: input.evidenceTypeId } : undefined,
+      metadata: {
+        ...(input.evidenceTypeId ? { evidenceTypeId: input.evidenceTypeId } : {}),
+        sealed: Boolean(sealed),
+      },
     });
 
     // Reflection safety acknowledgement (FR-EV-008): a behavioral safeguard,
@@ -188,6 +217,7 @@ export interface UpdateEvidencePatch {
   activityEndedOn?: string | null;
   evidenceTypeId?: string | null;
   narrativeDoc?: unknown;
+  contentEnc?: ContentEnc;
   typeFieldsJson?: Record<string, unknown> | null;
   provenanceId?: string | null;
 }
@@ -214,7 +244,21 @@ export async function updateEvidence(
   const changedFields: string[] = [];
   const values: Record<string, unknown> = {};
 
-  if (patch.title !== undefined && patch.title !== evidence.title) {
+  // Once sealed, an entry never accepts plaintext again — a client bug must
+  // not be able to leak content into the plaintext columns (ADR-007).
+  if (evidence.encrypted && (patch.title !== undefined || patch.narrativeDoc !== undefined)) {
+    return { ok: false, error: "invalid", issues: ["This entry is sealed; send contentEnc."] };
+  }
+  if (patch.contentEnc !== undefined) {
+    values.contentEnc = patch.contentEnc;
+    values.encrypted = true;
+    values.title = "";
+    values.narrativeDoc = emptyNarrativeDoc();
+    values.narrativeText = "";
+    changedFields.push(evidence.encrypted ? "content_enc" : "sealed");
+  }
+
+  if (!patch.contentEnc && patch.title !== undefined && patch.title !== evidence.title) {
     values.title = patch.title;
     changedFields.push("title");
   }
@@ -241,7 +285,7 @@ export async function updateEvidence(
     values.typeFieldsJson = patch.typeFieldsJson;
     changedFields.push("type_fields_json");
   }
-  if (patch.narrativeDoc !== undefined) {
+  if (!patch.contentEnc && patch.narrativeDoc !== undefined) {
     const narrative = validateNarrativeDoc(patch.narrativeDoc);
     if (!narrative.valid || !narrative.doc) {
       return { ok: false, error: "invalid", issues: narrative.issues };
@@ -374,6 +418,9 @@ async function createRevision(
     activityEndedOn: item.activityEndedOn,
     evidenceTypeId: item.evidenceTypeId,
     narrativeDoc: item.narrativeDoc,
+    // Sealed entries snapshot ciphertext only (ADR-007).
+    encrypted: item.encrypted,
+    contentEnc: item.contentEnc,
     typeFieldsJson: item.typeFieldsJson,
     provenanceId: item.provenanceId,
     objectiveIds: objectives.map((o) => o.objectiveId).sort(),
@@ -653,6 +700,8 @@ export function visibleEvidencePredicate(actor: Actor, enrolment: EnrolmentConte
 export interface EvidenceListRow {
   id: string;
   title: string;
+  encrypted: boolean;
+  titleEnc: Envelope | null;
   activityDate: string | null;
   archivedAt: Date | null;
   typeLabel: string;
@@ -670,6 +719,8 @@ export async function listEvidence(
     .select({
       id: evidenceItem.id,
       title: evidenceItem.title,
+      encrypted: evidenceItem.encrypted,
+      contentEnc: evidenceItem.contentEnc,
       activityDate: evidenceItem.activityDate,
       archivedAt: evidenceItem.archivedAt,
       typeLabel: evidenceType.label,
@@ -699,8 +750,9 @@ export async function listEvidence(
     )
     .groupBy(evidenceObjective.evidenceItemId);
   const countById = new Map(counts.map((c) => [c.evidenceItemId, c.count]));
-  return rows.map((row) => ({
+  return rows.map(({ contentEnc, ...row }) => ({
     ...row,
+    titleEnc: row.encrypted ? ((contentEnc as ContentEnc | null)?.title ?? null) : null,
     typeLabel: row.typeLabel ?? "Diary entry",
     typeCode: row.typeCode ?? "entry",
     objectiveCount: countById.get(row.id) ?? 0,
@@ -816,12 +868,23 @@ export async function listEvidenceForObjective(
   actor: Actor,
   enrolment: EnrolmentContext,
   objectiveId: string,
-): Promise<Array<{ id: string; title: string; activityDate: string | null; mappingNote: string | null }>> {
+): Promise<
+  Array<{
+    id: string;
+    title: string;
+    encrypted: boolean;
+    titleEnc: Envelope | null;
+    activityDate: string | null;
+    mappingNote: string | null;
+  }>
+> {
   const db = getDb();
-  return db
+  const rows = await db
     .select({
       id: evidenceItem.id,
       title: evidenceItem.title,
+      encrypted: evidenceItem.encrypted,
+      contentEnc: evidenceItem.contentEnc,
       activityDate: evidenceItem.activityDate,
       mappingNote: evidenceObjective.mappingNote,
     })
@@ -835,4 +898,8 @@ export async function listEvidenceForObjective(
       ),
     )
     .orderBy(desc(evidenceItem.activityDate));
+  return rows.map(({ contentEnc, ...row }) => ({
+    ...row,
+    titleEnc: row.encrypted ? ((contentEnc as ContentEnc | null)?.title ?? null) : null,
+  }));
 }

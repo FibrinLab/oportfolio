@@ -33,6 +33,9 @@ export const scanStatus = pgEnum("scan_status", [
   "clean",
   "rejected",
   "quarantined",
+  // Encrypted in the browser before upload (ADR-007): integrity-checked and
+  // stored, but not scannable server-side. Only the author can open it.
+  "sealed",
 ]);
 export const linkType = pgEnum("link_type", [
   "general",
@@ -104,6 +107,11 @@ export const evidenceItem = pgTable(
     narrativeDoc: jsonb("narrative_doc").notNull(),
     // Plain-text extraction for authorised search only.
     narrativeText: text("narrative_text").notNull().default(""),
+    // End-to-end encryption (ADR-007): when `encrypted`, title and narrative
+    // live only in `content_enc` ({ title: Envelope, narrative: Envelope })
+    // and the plaintext columns are empty — enforced by a CHECK constraint.
+    encrypted: boolean("encrypted").notNull().default(false),
+    contentEnc: jsonb("content_enc"),
     // Type-specific structured fields (spec/06 per-type table).
     typeFieldsJson: jsonb("type_fields_json"),
     provenanceId: uuid("provenance_id").references(() => provenanceType.id),
@@ -132,6 +140,10 @@ export const evidenceItem = pgTable(
     check(
       "evidence_item_private_only_check",
       sql`${t.visibility} = 'private' AND ${t.workflowState} = 'draft'`,
+    ),
+    check(
+      "evidence_item_encrypted_no_plaintext_check",
+      sql`NOT ${t.encrypted} OR (${t.title} = '' AND ${t.narrativeText} = '' AND ${t.contentEnc} IS NOT NULL)`,
     ),
   ],
 );
@@ -277,12 +289,20 @@ export const attachment = pgTable(
     scanEngineVersion: text("scan_engine_version"),
     scanCompletedAt: timestamp("scan_completed_at", { withTimezone: true }),
     previewKey: text("preview_key"),
+    // Sealed in the browser (ADR-007): bytes are an OPE1 container, the real
+    // filename and media type live only in `name_enc`.
+    encrypted: boolean("encrypted").notNull().default(false),
+    nameEnc: jsonb("name_enc"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...mutableColumns,
   },
   (t) => [
     uniqueIndex("attachment_object_key_unique").on(t.objectKey),
     index("attachment_parent_idx").on(t.parentType, t.parentId).where(sql`${t.deletedAt} IS NULL`),
+    check(
+      "attachment_encrypted_no_plaintext_check",
+      sql`NOT ${t.encrypted} OR (${t.displayName} = 'sealed' AND ${t.originalFilename} = 'sealed' AND ${t.nameEnc} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -303,10 +323,17 @@ export const externalLink = pgTable(
     description: text("description"),
     // Code artefact metadata (spec/06): revision/SHA, contribution, access.
     capturedMetadataJson: jsonb("captured_metadata_json"),
+    // Sealed in the browser (ADR-007): url/host/label live only in `link_enc`.
+    encrypted: boolean("encrypted").notNull().default(false),
+    linkEnc: jsonb("link_enc"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...mutableColumns,
   },
   (t) => [
     index("external_link_item_idx").on(t.evidenceItemId).where(sql`${t.deletedAt} IS NULL`),
+    check(
+      "external_link_encrypted_no_plaintext_check",
+      sql`NOT ${t.encrypted} OR (${t.url} = '' AND ${t.host} = '' AND ${t.label} IS NULL AND ${t.description} IS NULL AND ${t.linkEnc} IS NOT NULL)`,
+    ),
   ],
 );

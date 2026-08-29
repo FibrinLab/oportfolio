@@ -225,3 +225,17 @@ export const noticeAcknowledgement = pgTable(
   },
   (t) => [index("notice_ack_user_idx").on(t.tenantId, t.userId, t.noticeType)],
 );
+
+// End-to-end encryption key material (ADR-007). The diary key itself never
+// reaches the server: this row holds it wrapped under a passphrase-derived
+// KEK and under a recovery-key-derived KEK, plus KDF parameters. Losing the
+// passphrase and recovery key makes the diary unrecoverable by design.
+export const diaryKey = pgTable("diary_key", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => appUser.id),
+  keyVersion: integer("key_version").notNull().default(1),
+  materialJson: jsonb("material_json").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

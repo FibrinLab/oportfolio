@@ -16,6 +16,8 @@ import {
   MAX_FILE_BYTES,
   TEXT_EXTENSIONS,
 } from "@/server/files/uploadPolicy";
+import { isSealedFile, SEALED_FILE_OVERHEAD_BYTES } from "@/lib/crypto/envelope";
+import { createHash } from "node:crypto";
 
 // Scan pipeline (spec/07 steps 5-6): magic-byte type detection + OOXML zip
 // inspection + clamd INSTREAM. Only `clean` files ever become downloadable;
@@ -36,7 +38,8 @@ export async function handleScanAttachment(
   // Verify the object landed and respects the size limit.
   const head = await headQuarantineObject(row.objectKey);
   const actualSize = head.ContentLength ?? 0;
-  if (actualSize <= 0 || actualSize > MAX_FILE_BYTES) {
+  const sizeLimit = row.encrypted ? MAX_FILE_BYTES + SEALED_FILE_OVERHEAD_BYTES : MAX_FILE_BYTES;
+  if (actualSize <= 0 || actualSize > sizeLimit) {
     await finalise(payload, row.objectKey, "rejected", {
       reason: "size_mismatch",
       detected: null,
@@ -52,6 +55,43 @@ export async function handleScanAttachment(
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   const buffer = Buffer.concat(chunks);
+  const sha256 = createHash("sha256").update(buffer).digest("hex");
+
+  // Sealed file (ADR-007): encrypted in the browser, so neither content-type
+  // inspection nor malware scanning is possible. Check that it really is an
+  // OPE1 container, record its digest, and store it as `sealed` — a distinct
+  // state so nothing can mistake it for a scanned-clean file.
+  if (row.encrypted) {
+    if (!isSealedFile(buffer)) {
+      await finalise(payload, row.objectKey, "rejected", {
+        reason: "not_sealed_container",
+        detected: null,
+        engine: null,
+      });
+      return;
+    }
+    await promoteToClean(row.objectKey);
+    await db.transaction(async (tx) => {
+      await tx
+        .update(attachment)
+        .set({
+          scanStatus: "sealed",
+          mediaTypeDetected: "application/octet-stream",
+          sha256,
+          scanCompletedAt: new Date(),
+        })
+        .where(eq(attachment.id, payload.attachmentId));
+      await appendAudit(tx, {
+        tenantId: payload.tenantId,
+        actorType: "worker",
+        action: "attachment.scan_result",
+        targetType: "attachment",
+        targetId: payload.attachmentId,
+        metadata: { result: "sealed" },
+      });
+    });
+    return;
+  }
 
   const extension = row.originalFilename.split(".").pop()?.toLowerCase() ?? "";
 
@@ -127,6 +167,7 @@ export async function handleScanAttachment(
       .set({
         scanStatus: "clean",
         mediaTypeDetected,
+        sha256,
         scanEngineVersion: engine,
         scanCompletedAt: new Date(),
       })

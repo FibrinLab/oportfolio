@@ -1,3 +1,4 @@
+import { isSealedDiary } from "@/server/diary/sealing";
 import { getEnv } from "@/server/config/env";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/server/db/client";
@@ -103,7 +104,7 @@ export async function handlePurgeDiary(
       ),
     )
     .limit(1);
-  if (!successfulFinal[0]) {
+  if (!successfulFinal[0] && !(await isSealedDiary(db, payload.enrolmentId))) {
     throw new Error("final_export_not_ready");
   }
 

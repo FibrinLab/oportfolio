@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { getActor, resolveTenant } from "@/server/policy/actor";
 import { SignOutButton } from "./SignOutButton";
 import { BodyFontToggle } from "./BodyFontToggle";
+import { DiaryLockSettings } from "@/components/lock/DiaryLockSettings";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -47,6 +48,10 @@ export default async function AccountPage({
         </h2>
         <BodyFontToggle current={bodyFont} />
       </section>
+
+      {actor.memberships.some((m) => m.tenantId === tenantContext.tenantId && m.role === "fellow") ? (
+        <DiaryLockSettings />
+      ) : null}
 
       <SignOutButton />
     </>

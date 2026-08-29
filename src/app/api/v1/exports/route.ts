@@ -49,7 +49,11 @@ export const POST = withApi(
     } catch (error) {
       if (error instanceof DiaryExportValidationError) {
         return problem("validation-failed", requestId, {
-          detail: "Every retained attachment must finish its safety check before exporting.",
+          detail:
+            error.code === "diary_sealed"
+              ? "This diary is end-to-end encrypted. Use the in-browser export."
+              : "Every retained attachment must finish its safety check before exporting.",
+          code: error.code,
           attachmentNames: error.attachmentNames,
         });
       }

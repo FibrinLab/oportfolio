@@ -1,3 +1,6 @@
+import { DiaryLockGate } from "@/components/lock/DiaryLockGate";
+import { aad } from "@/lib/crypto/envelope";
+import { SealedText } from "@/components/lock/Sealed";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -32,7 +35,7 @@ export default async function ObjectiveDetailPage({
   const mappedEvidence = await listEvidenceForObjective(actor, enrolmentContext, objectiveId);
 
   return (
-    <>
+    <DiaryLockGate>
       <nav aria-label="Breadcrumb" style={{ marginBottom: "var(--space-4)", fontSize: "var(--text-sm)" }}>
         <Link href={`/t/${tenantSlug}/curriculum`}>Curriculum</Link>
         {" / "}
@@ -81,7 +84,7 @@ export default async function ObjectiveDetailPage({
             {mappedEvidence.map((item) => (
               <li key={item.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--space-2) 0" }}>
                 <Link href={`/t/${tenantSlug}/log/${item.id}`} style={{ fontWeight: 700 }}>
-                  {item.title}
+                  <SealedText envelope={item.titleEnc} aad={aad.evidenceTitle(item.id)} fallback={item.title || "(untitled)"} />
                 </Link>
                 {item.activityDate ? (
                   <span style={{ display: "block", fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
@@ -138,6 +141,6 @@ export default async function ObjectiveDetailPage({
           </ul>
         )}
       </section>
-    </>
+    </DiaryLockGate>
   );
 }

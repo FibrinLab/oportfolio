@@ -7,6 +7,7 @@ import { enqueue } from "@/server/outbox/outbox";
 import type { Actor } from "@/server/policy/actor";
 import type { EnrolmentContext } from "@/server/policy/policy";
 import { createDiaryExportJob } from "./export";
+import { isSealedDiary } from "./sealing";
 
 export const DIARY_ACCESS_DAYS = 90;
 
@@ -14,7 +15,7 @@ export async function finishDiary(
   actor: Actor,
   context: EnrolmentContext,
   requestId: string | null,
-): Promise<{ ok: true; exportJobId: string; accessEndsAt: Date } | { ok: false }> {
+): Promise<{ ok: true; exportJobId: string | null; accessEndsAt: Date } | { ok: false }> {
   if (
     context.fellowUserId !== actor.userId ||
     context.diaryState !== "open" ||
@@ -60,10 +61,15 @@ export async function finishDiary(
       diaryFinishCycle: finishCycle,
       diaryAccessEndsAt: accessEndsAt,
     };
-    const job = await createDiaryExportJob(tx as Db, actor, finishedContext, {
-      kind: "final",
-      finishCycle,
-    });
+    // A sealed diary (ADR-007) cannot be exported server-side: the browser
+    // builds the archive, and the finish screen asks for that first.
+    const sealed = await isSealedDiary(tx as Db, context.id);
+    const job = sealed
+      ? null
+      : await createDiaryExportJob(tx as Db, actor, finishedContext, {
+          kind: "final",
+          finishCycle,
+        });
 
     const reminder = async (
       kind: "thirty_days" | "seven_days" | "one_day",
@@ -93,9 +99,9 @@ export async function finishDiary(
       targetId: context.id,
       enrolmentId: context.id,
       requestId,
-      metadata: { finishCycle, accessEndsAt: accessEndsAt.toISOString() },
+      metadata: { finishCycle, accessEndsAt: accessEndsAt.toISOString(), sealed },
     });
-    return { ok: true as const, exportJobId: job.id, accessEndsAt };
+    return { ok: true as const, exportJobId: job?.id ?? null, accessEndsAt };
   });
 }
 

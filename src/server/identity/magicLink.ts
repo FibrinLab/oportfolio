@@ -7,6 +7,7 @@ import { appendAudit } from "@/server/audit/audit";
 import { enqueue } from "@/server/outbox/outbox";
 import { checkRateLimit } from "./rateLimit";
 import { createSession } from "./sessions";
+import { recordNoticeAcknowledgements, type NoticeInput } from "./notices";
 import { ensureSelfServiceAccount } from "./selfService";
 import { generateToken, hashToken, normaliseEmail } from "./tokens";
 
@@ -66,6 +67,7 @@ export async function consumeMagicLink(
   db: Db,
   token: string,
   requestId: string | null,
+  acknowledgedNotices: NoticeInput[] = [],
 ): Promise<SignInResult | null> {
   const tokenHash = hashToken(token);
   return db.transaction(async (tx) => {
@@ -104,6 +106,7 @@ export async function consumeMagicLink(
       .from(membership)
       .where(sql`${membership.userId} = ${user.id} AND ${membership.status} = 'active'`);
     for (const row of tenants) {
+      await recordNoticeAcknowledgements(tx, row.tenantId, user.id, acknowledgedNotices, "sign_in");
       await appendAudit(tx, {
         tenantId: row.tenantId,
         actorUserId: user.id,

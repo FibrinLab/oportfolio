@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const NOTICE_VERSION = "2026-08";
+import { NOTICE_VERSION } from "@/lib/notices";
 
 const inputStyle: React.CSSProperties = {
   display: "block",

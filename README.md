@@ -31,6 +31,10 @@ The private-diary foundation is implemented:
   inspection, only clean files downloadable via short-lived signed URLs; HTTPS-only
   external links that are never fetched server-side
 - Hash-chained, append-only audit log written in the same transaction as each mutation
+- End-to-end encryption ([ADR-007](spec/decisions/ADR-007-end-to-end-encryption.md)):
+  titles, reflections, links and files are encrypted in the browser under a key only the
+  fellow's passphrase or recovery key can unwrap; the server stores ciphertext and cannot
+  read a diary; exports are assembled in the browser
 - Owner-only authorization for entries, archived entries, revisions, links, files,
   curriculum views and generated exports—even legacy shared rows are narrowed to private
 - Portable ZIP exports containing a readable PDF, versioned JSON, retained attachments,
@@ -114,8 +118,8 @@ Dockerfile          web + worker images (non-root, production deps only)
 
 ## Privacy and retention posture
 
-Diary authorization is owner-only and default-deny across pages, APIs, curriculum counts,
-files and downloads. A supervisor/faculty role or historical visibility value never grants
+Diary content is end-to-end encrypted (ADR-007) and authorization is owner-only and
+default-deny across pages, APIs, curriculum counts, files and downloads. A supervisor/faculty role or historical visibility value never grants
 content access. Authorization denials on object reads are byte-identical to not-found,
 and notifications carry neutral text only. Export snapshots and ZIP objects are scrubbed
 on expiry; diary content is purged after a finished diary's 90-day access window unless an

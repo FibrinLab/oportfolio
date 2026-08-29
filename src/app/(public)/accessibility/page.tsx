@@ -164,6 +164,8 @@ export default function AccessibilityStatementPage() {
       <footer className={styles.footer}>
         <Link href="/about">About oPortfolio</Link>
         <span aria-hidden="true">·</span>
+        <Link href="/privacy">Privacy</Link>
+        <span aria-hidden="true">·</span>
         <Link href="/sign-in">Sign in</Link>
       </footer>
     </div>

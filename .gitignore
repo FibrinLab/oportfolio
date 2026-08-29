@@ -4,6 +4,8 @@ node_modules/
 
 # next.js
 .next/
+.open-next/
+.wrangler/
 out/
 next-env.d.ts
 
@@ -15,6 +17,7 @@ dist/
 .env
 .env.*
 !.env.example
+.dev.vars
 
 # testing
 coverage/

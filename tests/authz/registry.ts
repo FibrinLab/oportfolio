@@ -66,7 +66,14 @@ export const SURFACES: Surface[] = [
     kind: "api",
     method: "POST",
     path: () => "/api/v1/auth/verify",
-    body: () => ({ token: "invalid-token-invalid-token" }),
+    body: () => ({
+      token: "invalid-token-invalid-token",
+      acknowledgedNotices: [
+        { noticeType: "privacy_notice", noticeVersion: "t" },
+        { noticeType: "acceptable_use", noticeVersion: "t" },
+        { noticeType: "no_patient_data", noticeVersion: "t" },
+      ],
+    }),
     allowed: [],
     public: true,
   },
@@ -128,6 +135,53 @@ export const SURFACES: Surface[] = [
     path: () => "/api/v1/me",
     // Any live session may introspect itself — even with no memberships.
     allowed: [...TENANT_MEMBERS, "wrongTenantFellow", "noRoleUser"],
+  },
+  {
+    id: "me.diary-key.get",
+    routeFile: "src/app/api/v1/me/diary-key/route.ts",
+    kind: "api",
+    method: "GET",
+    path: () => "/api/v1/me/diary-key",
+    // Wrapped key material only (ADR-007); any live session may read its own.
+    allowed: [...TENANT_MEMBERS, "wrongTenantFellow", "noRoleUser"],
+  },
+  {
+    id: "me.diary-key.put",
+    routeFile: "src/app/api/v1/me/diary-key/route.ts",
+    kind: "api",
+    method: "PUT",
+    path: () => "/api/v1/me/diary-key",
+    // Deliberately invalid material (iterations below the floor): proves the
+    // authentication gate without writing a key that would seal a persona's
+    // diary for the rest of the matrix.
+    body: () => ({
+      material: {
+        keyVersion: 1,
+        kdf: { alg: "PBKDF2-SHA256", iterations: 1 },
+        passphraseSalt: "AAAAAAAAAAAAAAAAAAAAAA",
+        wrappedByPassphrase: { iv: "AAAAAAAAAAAAAAAA", ct: "A".repeat(64) },
+        recoverySalt: "AAAAAAAAAAAAAAAAAAAAAA",
+        wrappedByRecovery: { iv: "AAAAAAAAAAAAAAAA", ct: "A".repeat(64) },
+      },
+    }),
+    allowed: [...TENANT_MEMBERS, "wrongTenantFellow", "noRoleUser"],
+    allowStatus: 422,
+  },
+  {
+    id: "me.unsealed",
+    routeFile: "src/app/api/v1/me/unsealed/route.ts",
+    kind: "api",
+    method: "GET",
+    path: () => "/api/v1/me/unsealed",
+    allowed: [...TENANT_MEMBERS, "wrongTenantFellow", "noRoleUser"],
+  },
+  {
+    id: "enrolments.export-bundle",
+    routeFile: "src/app/api/v1/enrolments/[enrolmentId]/export-bundle/route.ts",
+    kind: "api",
+    method: "GET",
+    path: (f) => `/api/v1/enrolments/${f.enrolmentId}/export-bundle`,
+    allowed: ["owner"],
   },
   {
     id: "evidence.list",
@@ -532,6 +586,15 @@ export const SURFACES: Surface[] = [
     kind: "page",
     method: "GET",
     path: () => "/invite/not-a-real-token-authz",
+    allowed: [],
+    public: true,
+  },
+  {
+    id: "page.privacy",
+    routeFile: "src/app/(public)/privacy/page.tsx",
+    kind: "page",
+    method: "GET",
+    path: () => "/privacy",
     allowed: [],
     public: true,
   },

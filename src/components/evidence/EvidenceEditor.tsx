@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/apiClient";
 import { useAutosave } from "@/lib/useAutosave";
+import { aad, decryptJson, encryptJson, type Envelope } from "@/lib/crypto/envelope";
+import { useDiaryLock } from "@/lib/crypto/DiaryLockContext";
 import forms from "@/components/ds/forms.module.css";
 import styles from "./EvidenceEditor.module.css";
 import { FilesAndLinks } from "./FilesAndLinks";
@@ -29,6 +31,10 @@ export interface EditorEvidence {
   activityDate: string | null;
   evidenceTypeId: string | null;
   narrativeDoc: unknown;
+  // Sealed entries (ADR-007): plaintext fields are empty and these hold
+  // the ciphertext the browser opens with the diary key.
+  encrypted?: boolean;
+  contentEnc?: { title: Envelope; narrative: Envelope } | null;
   objectiveIds: string[];
   rowVersion: number;
 }
@@ -62,18 +68,47 @@ export function EvidenceEditor({
   pickerObjectives: PickerObjective[];
   frameworkLabel: string | null;
   reflectionAcknowledgedBefore: boolean;
-  initialFiles?: Array<{ id: string; displayName: string; sizeBytes: number; scanStatus: string }>;
-  initialLinks?: Array<{ id: string; url: string; host: string; label: string | null }>;
+  initialFiles?: Array<{ id: string; encrypted: boolean; nameEnc: Envelope | null; displayName: string; sizeBytes: number; scanStatus: string }>;
+  initialLinks?: Array<{ id: string; encrypted: boolean; linkEnc: Envelope | null; url: string; host: string; label: string | null }>;
 }) {
+  const lock = useDiaryLock();
+  // Sealed entries choose their own id up front so ciphertext can be bound
+  // to it before the row exists (AAD = evidence id).
+  const draftIdRef = useRef(initial.id ?? crypto.randomUUID());
   const [evidenceId, setEvidenceId] = useState(initial.id);
-  const [title, setTitle] = useState(initial.title);
+  const [title, setTitle] = useState(initial.encrypted ? "" : initial.title);
+  const [openedDoc, setOpenedDoc] = useState<unknown>(initial.encrypted ? null : initial.narrativeDoc);
+  const [openError, setOpenError] = useState<string | null>(null);
   const [activityDate, setActivityDate] = useState(initial.activityDate ?? "");
   const [evidenceTypeId, setEvidenceTypeId] = useState(initial.evidenceTypeId ?? "");
   const [objectiveIds, setObjectiveIds] = useState<string[]>(initial.objectiveIds);
   const [reflectionAck, setReflectionAck] = useState(reflectionAcknowledgedBefore);
   const [mappingError, setMappingError] = useState<string | null>(null);
-  const narrativeRef = useRef<unknown>(initial.narrativeDoc);
+  const narrativeRef = useRef<unknown>(initial.encrypted ? null : initial.narrativeDoc);
   const evidenceIdRef = useRef(initial.id);
+
+  // Open a sealed entry once the key is available.
+  useEffect(() => {
+    if (!initial.encrypted || !initial.contentEnc || !initial.id || !lock.key) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [openTitle, openDoc] = await Promise.all([
+          decryptJson<string>(lock.key!, initial.contentEnc!.title, aad.evidenceTitle(initial.id!)),
+          decryptJson<unknown>(lock.key!, initial.contentEnc!.narrative, aad.evidenceNarrative(initial.id!)),
+        ]);
+        if (cancelled) return;
+        setTitle(openTitle);
+        narrativeRef.current = openDoc;
+        setOpenedDoc(openDoc);
+      } catch {
+        if (!cancelled) setOpenError("This entry could not be opened with your current key.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initial.encrypted, initial.contentEnc, initial.id, lock.key]);
   const objectiveIdsRef = useRef(initial.objectiveIds);
   useEffect(() => {
     objectiveIdsRef.current = objectiveIds;
@@ -111,6 +146,20 @@ export function EvidenceEditor({
       if (draftIsReflection && !reflectionAck && !evidenceIdRef.current) {
         return { ok: false as const, message: "Confirm the reflection safety note to save." };
       }
+      if (!lock.key) return { ok: false as const, message: "Unlock your diary to save." };
+
+      // Seal title and narrative for the entry id (ADR-007); the server
+      // never receives plaintext.
+      const targetId = evidenceIdRef.current ?? draftIdRef.current;
+      const contentEnc = {
+        title: await encryptJson(lock.key, lock.keyVersion, draft.title.trim(), aad.evidenceTitle(targetId)),
+        narrative: await encryptJson(
+          lock.key,
+          lock.keyVersion,
+          draft.narrativeDoc ?? { type: "doc", content: [{ type: "paragraph" }] },
+          aad.evidenceNarrative(targetId),
+        ),
+      };
 
       if (!evidenceIdRef.current) {
         if (!draft.title.trim()) {
@@ -123,10 +172,10 @@ export function EvidenceEditor({
             method: "POST",
             tenantSlug,
             body: {
-              title: draft.title.trim(),
+              id: targetId,
               activityDate: draft.activityDate,
               evidenceTypeId: draft.evidenceTypeId,
-              narrativeDoc: draft.narrativeDoc,
+              contentEnc,
               reflectionAcknowledged: draftIsReflection ? reflectionAck : undefined,
             },
             idempotencyKey: crypto.randomUUID(),
@@ -152,23 +201,29 @@ export function EvidenceEditor({
         };
       }
 
+      const sealedPatch = {
+        activityDate: draft.activityDate,
+        evidenceTypeId: draft.evidenceTypeId,
+        contentEnc,
+      };
       const result = await api<{ rowVersion: number }>(
         `/api/v1/diary-entries/${evidenceIdRef.current}`,
         {
           method: "PATCH",
           tenantSlug,
           ifMatch: rowVersion,
-          body: draft,
+          body: sealedPatch,
         },
       );
       if (result.ok) return { ok: true as const, rowVersion: result.data.rowVersion };
       if (result.problem.status === 412) {
         // Preserve this tab's words server-side BEFORE showing the choice —
-        // the conflict panel promises they are recoverable (AC-04).
+        // the conflict panel promises they are recoverable (AC-04). Sealed,
+        // like everything else.
         await api(`/api/v1/diary-entries/${evidenceIdRef.current}/revisions`, {
           method: "POST",
           tenantSlug,
-          body: { snapshot: draft as unknown as Record<string, unknown> },
+          body: { snapshot: { ...sealedPatch, encrypted: true } },
         });
         return {
           ok: false as const,
@@ -182,11 +237,12 @@ export function EvidenceEditor({
       if (result.problem.status === 0) return { ok: false as const, offline: true };
       return { ok: false as const, message: String(result.problem.detail ?? "Could not save") };
     },
-    [enrolmentId, tenantSlug, reflectionAck, options.types],
+    [enrolmentId, tenantSlug, reflectionAck, options.types, lock.key, lock.keyVersion],
   );
 
   const autosave = useAutosave<DraftPayload>({
-    storageKey: `evidence-draft:${evidenceId ?? "new"}`,
+    // No plaintext mirror on disk for a sealed diary (ADR-007).
+    storageKey: null,
     initialRowVersion: initial.rowVersion,
     save,
   });
@@ -365,14 +421,22 @@ export function EvidenceEditor({
             <p className={forms.hint}>
               20–20,000 characters. Headings, lists, bold, italics and safe links are available.
             </p>
-            <NarrativeEditor
-              initialDoc={initial.narrativeDoc}
-              labelledBy="ev-narrative-label"
-              onChange={(doc) => {
-                narrativeRef.current = doc;
-                touch();
-              }}
-            />
+            {openError ? (
+              <p role="alert" className={forms.error}>
+                ERROR: {openError}
+              </p>
+            ) : openedDoc === null ? (
+              <p aria-busy="true">Opening entry…</p>
+            ) : (
+              <NarrativeEditor
+                initialDoc={openedDoc}
+                labelledBy="ev-narrative-label"
+                onChange={(doc) => {
+                  narrativeRef.current = doc;
+                  touch();
+                }}
+              />
+            )}
           </div>
 
         </div>
@@ -411,8 +475,9 @@ export function EvidenceEditor({
           <div className={forms.notice}>
             <p className={forms.noticeTitle}>PRIVACY</p>
             <p>
-              This entry is visible only to you. Other users cannot read its title, date, files,
-              links, or reflection.
+              This entry is encrypted in your browser before it is saved. Nobody else — not
+              other users and not the service operator — can read its title, files, links or
+              reflection.
             </p>
           </div>
         </aside>

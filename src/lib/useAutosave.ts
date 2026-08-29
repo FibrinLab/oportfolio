@@ -27,7 +27,9 @@ export interface AutosaveController<TDraft> {
 const DEBOUNCE_MS = 2000;
 
 export function useAutosave<TDraft>(options: {
-  storageKey: string;
+  // null disables the localStorage mirror (sealed diaries keep no plaintext
+  // at rest on the device — ADR-007).
+  storageKey: string | null;
   initialRowVersion: number;
   save: (
     draft: TDraft,
@@ -63,7 +65,7 @@ export function useAutosave<TDraft>(options: {
     if (result.ok) {
       rowVersionRef.current = result.rowVersion;
       try {
-        localStorage.removeItem(options.storageKey);
+        if (options.storageKey) localStorage.removeItem(options.storageKey);
       } catch {
         // storage unavailable — server save succeeded, nothing to do
       }
@@ -100,7 +102,7 @@ export function useAutosave<TDraft>(options: {
       draftRef.current = draft;
       // Local mirror first: recoverable even if the network dies now.
       try {
-        localStorage.setItem(options.storageKey, JSON.stringify(draft));
+        if (options.storageKey) localStorage.setItem(options.storageKey, JSON.stringify(draft));
       } catch {
         // private browsing/quota — server autosave still applies
       }

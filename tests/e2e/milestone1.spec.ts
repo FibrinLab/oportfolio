@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { latestEmailLink, signInViaMagicLink, uniqueSuffix } from "./helpers";
+import { ensureDiaryUnlocked, latestEmailLink, signInViaMagicLink, uniqueSuffix } from "./helpers";
 
 // Private-diary definition-of-done journey: onboarding and pinned curriculum,
 // owner-only entries, mappings, conflict recovery, links, portable export and
@@ -56,14 +56,17 @@ test("AC-01: faculty invites; fellow onboards and sees the pinned curriculum", a
   }
   await fellowPage.getByRole("button", { name: "Accept invitation and continue" }).click();
   await fellowPage.waitForURL(/\/t\/demo\/today/);
+  await fellowPage.goto("/t/demo/log");
+  await ensureDiaryUnlocked(fellowPage);
+  await fellowPage.goto("/t/demo/today");
 
-  // Programme and pinned curriculum version.
-  await expect(fellowPage.getByText("Fellowship in Clinical AI — Cohort 5")).toBeVisible();
-  await expect(fellowPage.getByText(/Your diary is private/)).toBeVisible();
-  await expect(fellowPage.getByText(/version 3\.2/)).toBeVisible();
+  // The private diary space, then the pinned curriculum version.
+  await expect(fellowPage.getByRole("heading", { name: "Your private log" })).toBeVisible();
+  await expect(fellowPage.getByText(/Only you can read your entries/)).toBeVisible();
 
   // Exactly 5 domains / 30 objectives from the pinned release.
   await fellowPage.goto("/t/demo/curriculum");
+  await expect(fellowPage.getByText(/version 3\.2/)).toBeVisible();
   await expect(fellowPage.getByText("5 domains, 30 objectives")).toBeVisible();
   await expect(fellowPage.getByText("mapped evidence, not competence")).toBeVisible();
   const objectiveLinks = fellowPage.locator('a[href*="/curriculum/"]');
@@ -212,18 +215,25 @@ test("The fellow can archive an entry without exposing or deleting it", async ()
   await expect(fellowPage.getByRole("button", { name: "Restore entry" })).toBeVisible();
 });
 
-test("The fellow downloads a complete ZIP, finishes read-only, then reopens", async () => {
+test("The fellow builds a complete ZIP in the browser, finishes read-only, then reopens", async () => {
   await fellowPage.goto("/t/demo/diary-export");
-  await fellowPage.getByRole("button", { name: "Create complete export" }).click();
-  await expect(fellowPage.getByText("[EXPORT READY]")).toBeVisible({ timeout: 30_000 });
+  await ensureDiaryUnlocked(fellowPage);
+  // ADR-007: the archive is decrypted and assembled client-side; the
+  // server only ever hands over ciphertext.
+  await fellowPage.getByRole("button", { name: "Build my export" }).click();
+  await expect(fellowPage.getByText("[EXPORT READY]")).toBeVisible({ timeout: 60_000 });
 
-  const downloadHref = await fellowPage.getByRole("link", { name: "Download ZIP" }).getAttribute("href");
-  expect(downloadHref).toBeTruthy();
-  const download = await fellowPage.request.get(downloadHref!);
-  expect(download.status()).toBe(200);
-  expect((await download.body()).subarray(0, 2).toString("ascii")).toBe("PK");
+  const [download] = await Promise.all([
+    fellowPage.waitForEvent("download"),
+    fellowPage.getByRole("link", { name: "Download ZIP" }).click(),
+  ]);
+  const { readFileSync } = await import("node:fs");
+  const zipBytes = readFileSync((await download.path())!);
+  expect(zipBytes.subarray(0, 2).toString("ascii")).toBe("PK");
+  expect(zipBytes.length).toBeGreaterThan(1000);
 
   await fellowPage.getByLabel(/Type FINISH MY DIARY/).fill("FINISH MY DIARY");
+  await fellowPage.getByRole("checkbox", { name: /downloaded my export/i }).check();
   await fellowPage.getByRole("button", { name: "Finish my diary" }).click();
   await expect(fellowPage.getByRole("heading", { name: "Diary finished" })).toBeVisible();
 

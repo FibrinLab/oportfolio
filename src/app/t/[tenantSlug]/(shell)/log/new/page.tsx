@@ -1,3 +1,4 @@
+import { DiaryLockGate } from "@/components/lock/DiaryLockGate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
@@ -39,6 +40,7 @@ export default async function NewEvidencePage({
     .limit(1);
 
   return (
+    <DiaryLockGate>
     <EvidenceEditor
       tenantSlug={tenantSlug}
       enrolmentId={context.enrolment.id}
@@ -60,5 +62,6 @@ export default async function NewEvidencePage({
       frameworkLabel={context.frameworkLabel}
       reflectionAcknowledgedBefore={priorReflectionAck.length > 0}
     />
+    </DiaryLockGate>
   );
 }

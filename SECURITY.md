@@ -52,13 +52,19 @@ Key implementation properties:
 - Opaque session tokens (32 random bytes), only SHA-256 hashes stored;
   `__Host-` cookie, `HttpOnly`, `Secure`, `SameSite=Lax`; 60-minute idle and
   12-hour absolute timeouts; rotation on any permission change.
+- End-to-end encryption of diary content (ADR-007): titles, narratives,
+  links and files are AES-256-GCM encrypted in the browser under a per-user
+  key that only the user's passphrase or recovery key can unwrap; the server,
+  database and backups hold ciphertext; DB constraints refuse plaintext on
+  sealed rows; exports are built client-side.
 - Owner-only, default-deny authorization on every route with a generated
   matrix test; denials are byte-identical to not-found.
 - Origin/`Sec-Fetch-Site` CSRF checks on every state-changing request;
   strict nonce-based Content Security Policy; HSTS; no third-party scripts.
-- Uploads go straight to a quarantine bucket via presigned POST, are scanned
-  by ClamAV and inspected for content type, and are only downloadable via
-  short-lived signed URLs once clean.
+- Uploads are encrypted in the browser, go straight to a quarantine bucket via
+  presigned POST, are integrity-checked and stored as `sealed`, and can only
+  be opened by their author (legacy plaintext files are ClamAV-scanned and
+  type-inspected before release).
 - Hash-chained, append-only audit log written in the same transaction as
   each mutation.
 - Production startup refuses development credentials, non-HTTPS origins and

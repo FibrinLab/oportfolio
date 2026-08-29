@@ -6,6 +6,7 @@ import { appendAudit } from "@/server/audit/audit";
 import type { Actor } from "@/server/policy/actor";
 import { canEditEvidence } from "@/server/policy/policy";
 import type { EvidenceAccess } from "./evidence";
+import type { Envelope } from "@/lib/crypto/envelope";
 
 // External links (FR-FI-004, spec/05): HTTPS only, host stored for display,
 // NEVER fetched server-side (anti-SSRF, spec/07:168-171).
@@ -22,16 +23,58 @@ export type LinkType =
 export async function addLink(
   actor: Actor,
   access: EvidenceAccess,
-  input: { url: string; label?: string; linkType?: LinkType; description?: string },
+  input: {
+    id?: string;
+    url?: string;
+    linkEnc?: Envelope;
+    label?: string;
+    linkType?: LinkType;
+    description?: string;
+  },
   requestId: string | null,
 ): Promise<{ ok: true; id: string; host: string } | { ok: false; reason: string }> {
   if (!canEditEvidence(actor, access.evidence, access.enrolment).allow) {
     return { ok: false, reason: "denied" };
   }
 
+  // Sealed link (ADR-007): the browser validated https:// and stored url,
+  // host and label inside the envelope; the server keeps only ciphertext.
+  if (input.linkEnc) {
+    if (input.url || input.label || input.description) {
+      return { ok: false, reason: "A sealed link cannot also carry plaintext." };
+    }
+    const id = input.id ?? uuidv7();
+    const db = getDb();
+    await db.transaction(async (tx) => {
+      await tx.insert(externalLink).values({
+        id,
+        tenantId: access.evidence.tenantId,
+        evidenceItemId: access.evidence.id,
+        linkType: input.linkType ?? "general",
+        url: "",
+        host: "",
+        encrypted: true,
+        linkEnc: input.linkEnc,
+        createdBy: actor.userId,
+        updatedBy: actor.userId,
+      });
+      await appendAudit(tx, {
+        tenantId: access.evidence.tenantId,
+        actorUserId: actor.userId,
+        action: "link.added",
+        targetType: "external_link",
+        targetId: id,
+        enrolmentId: access.evidence.enrolmentId,
+        requestId,
+        metadata: { sealed: true, linkType: input.linkType ?? "general" },
+      });
+    });
+    return { ok: true, id, host: "" };
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(input.url);
+    parsed = new URL(input.url ?? "");
   } catch {
     return { ok: false, reason: "Enter a full link starting with https://" };
   }
@@ -42,7 +85,7 @@ export async function addLink(
     return { ok: false, reason: "Links must not contain credentials." };
   }
 
-  const id = uuidv7();
+  const id = input.id ?? uuidv7();
   const db = getDb();
   await db.transaction(async (tx) => {
     await tx.insert(externalLink).values({
@@ -113,6 +156,8 @@ export async function listLinks(evidenceId: string, tenantId: string) {
       host: externalLink.host,
       label: externalLink.label,
       linkType: externalLink.linkType,
+      encrypted: externalLink.encrypted,
+      linkEnc: externalLink.linkEnc,
     })
     .from(externalLink)
     .where(
@@ -121,5 +166,6 @@ export async function listLinks(evidenceId: string, tenantId: string) {
         eq(externalLink.evidenceItemId, evidenceId),
         isNull(externalLink.deletedAt),
       ),
-    );
+    )
+    .then((rows) => rows.map((row) => ({ ...row, linkEnc: (row.linkEnc as Envelope | null) ?? null })));
 }

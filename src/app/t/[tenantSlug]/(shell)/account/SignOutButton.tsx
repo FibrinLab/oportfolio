@@ -1,7 +1,11 @@
 "use client";
 
+import { clearDeviceKeys } from "@/lib/crypto/deviceStore";
+
 export function SignOutButton() {
   async function onSignOut() {
+    // The diary key never outlives the sign-in on this device (ADR-007).
+    await clearDeviceKeys();
     await fetch("/api/v1/auth/sign-out", { method: "POST" });
     // Full navigation (not the client router) so no server-component cache
     // from the signed-in session survives.

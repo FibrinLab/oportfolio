@@ -72,14 +72,19 @@ never grant the app role `TRUNCATE`/`DROP`.
 **Object storage.** Three private buckets, public access blocked at the account
 level, server-side encryption on, versioning off for quarantine (objects are
 deleted after scanning), lifecycle rule to expire quarantine objects older than
-1 day. The app key needs only: `s3:PutObject` (via presigned POST) on
+1 day. Diary files arrive already encrypted by the browser (ADR-007) and are
+stored as `sealed`; downloads of sealed files are streamed through `web`, so
+no bucket CORS configuration is needed. The export bucket now only serves
+legacy (pre-encryption) archives. The app key needs only: `s3:PutObject` (via presigned POST) on
 quarantine; `GetObject`/`DeleteObject`/`HeadObject` on quarantine;
 `PutObject`/`GetObject`/`DeleteObject` on clean and export. Presigned URLs are
 valid for 5 minutes.
 
 **ClamAV.** Run `clamav/clamav-debian` with a persistent signature volume and
-freshclam enabled; reachable from the worker network only. Files stay in
-`pending_scan` (not downloadable) until clamd is healthy.
+freshclam enabled; reachable from the worker network only. It scans only
+legacy plaintext files; browser-sealed files cannot be scanned and are
+integrity-checked instead (ADR-007). Files stay in `pending_scan` (not
+downloadable) until the worker has processed them.
 
 **SMTP.** Authenticated relay over TLS; SPF, DKIM and DMARC for the `SMTP_FROM`
 domain (magic links are the only credential — spoofable mail is an account
@@ -124,7 +129,11 @@ previous release runs against the newer schema.
   not outlive it in backups.
 - **Retention automation.** The worker purges finished diaries after the 90-day
   access window (unless a retention hold exists), scrubs expired export
-  objects, and prunes spent auth tokens and rate-limit rows. Monitor the
+  objects, and prunes spent auth tokens and rate-limit rows. Encrypted diaries
+  have no server-side final export; purge proceeds on schedule regardless.
+- **Key loss.** There is no operator recovery for a lost passphrase + recovery
+  key (ADR-007). Support replies must say so; never attempt to "reset" a
+  diary key — overwriting `diary_key` would destroy access permanently. Monitor the
   `outbox` table for `failed` rows — a stalled worker is a compliance failure,
   not just a bug.
 - **Monitoring.** Alert on: health check failing, outbox failures, clamd
@@ -138,10 +147,10 @@ previous release runs against the newer schema.
 - **Self-service sign-up.** Any address can request a link, so the SMTP
   relay must tolerate the per-address (5/h) and per-IP (20/h) limits and
   `TRUSTED_PROXY_HOPS` must be correct or the IP limit is inert. Self-created
-  workspaces have no `controller_name`/`privacy_notice_url`; the operator is
-  the controller and must publish a privacy notice and record notice
-  acknowledgement (privacy, acceptable use, no patient data) at first sign-in —
-  the invitation flow does this, the self-service flow currently does not.
+  workspaces record the operator as controller and link `/privacy`; every
+  sign-in confirms the current notice version (rows in `notice_acknowledgement`).
+  Bump `NOTICE_VERSION` in `src/lib/notices.ts` when the notice changes, and fill
+  in `PROVIDERS` on the privacy page before going live.
 - **Data subject requests.** Fellows self-serve export and deletion
   (finish → 90 days). For DSARs from others, the DPO route in the privacy
   notice applies; staff cannot read diary content in-product by design.

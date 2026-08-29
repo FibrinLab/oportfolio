@@ -49,10 +49,12 @@ export const createDiaryEntryPOST = withApi(
     const enrolment = await loadEnrolmentContext(tenantId, params.enrolmentId!);
     if (!enrolment) return notFoundProblem(requestId);
     const result = await createEvidence(actor, enrolment, {
+      id: body.id,
       title: body.title,
       activityDate: body.activityDate ?? null,
       evidenceTypeId: body.evidenceTypeId ?? null,
       narrativeDoc: body.narrativeDoc,
+      contentEnc: body.contentEnc,
       reflectionAcknowledged: body.reflectionAcknowledged,
       requestId,
     });
@@ -85,6 +87,8 @@ export const diaryEntryGET = withApi({}, async ({ actor, params, request, reques
       activityEndedOn: evidence.activityEndedOn,
       entryTypeId: evidence.evidenceTypeId,
       narrativeDoc: evidence.narrativeDoc,
+      encrypted: evidence.encrypted,
+      contentEnc: evidence.contentEnc,
       archivedAt: evidence.archivedAt,
       objectiveIds,
       rowVersion: evidence.rowVersion,

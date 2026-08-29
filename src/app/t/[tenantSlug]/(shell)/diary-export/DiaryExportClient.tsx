@@ -1,69 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/apiClient";
+import { useDiaryLock } from "@/lib/crypto/DiaryLockContext";
+import { buildDiaryArchive, type ArchiveProgress } from "@/lib/export/buildArchive";
 import forms from "@/components/ds/forms.module.css";
 
-type ExportStatus = "queued" | "processing" | "ready" | "failed" | "superseded" | "expired";
-
-interface ExportView {
-  id: string;
-  status: ExportStatus;
-  kind: "standard" | "final";
-  failureDetail: string | null;
-  downloadUrl: string | null;
-}
+// Export is built in the browser (ADR-007): the server cannot read a sealed
+// diary, so it hands over ciphertext and this page decrypts, renders and
+// zips locally. Finishing the diary therefore asks the user to download
+// first — there is no server-side final copy.
 
 export function DiaryExportClient({
   tenantSlug,
   enrolmentId,
   diaryState,
   accessEndsAt,
-  initialExport,
 }: {
   tenantSlug: string;
   enrolmentId: string;
   diaryState: "open" | "finished" | "purged";
   accessEndsAt: string | null;
-  initialExport: ExportView | null;
 }) {
-  const [currentExport, setCurrentExport] = useState(initialExport);
+  const lock = useDiaryLock();
+  const [progress, setProgress] = useState<ArchiveProgress | null>(null);
+  const [built, setBuilt] = useState<{ url: string; filename: string; skipped: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [downloadedFirst, setDownloadedFirst] = useState(false);
 
-  useEffect(() => {
-    if (!currentExport || !["queued", "processing"].includes(currentExport.status)) return;
-    const timer = window.setInterval(async () => {
-      const result = await api<ExportView>(`/api/v1/exports/${currentExport.id}`, {
-        tenantSlug,
-      });
-      if (result.ok) setCurrentExport(result.data);
-    }, 2000);
-    return () => window.clearInterval(timer);
-  }, [currentExport, tenantSlug]);
-
-  async function requestExport() {
+  async function buildExport() {
+    if (!lock.key) return;
     setBusy(true);
     setError(null);
-    const result = await api<{ id: string; status: ExportStatus }>("/api/v1/exports", {
-      method: "POST",
-      tenantSlug,
-      body: { enrolmentId },
-      idempotencyKey: crypto.randomUUID(),
-    });
-    if (result.ok) {
-      setCurrentExport({
-        id: result.data.id,
-        status: result.data.status,
-        kind: "standard",
-        failureDetail: null,
-        downloadUrl: null,
-      });
-    } else {
-      setError(String(result.problem.detail ?? "The export could not be requested."));
+    setBuilt(null);
+    try {
+      const result = await buildDiaryArchive({ tenantSlug, enrolmentId, key: lock.key, onProgress: setProgress });
+      const url = URL.createObjectURL(result.blob);
+      setBuilt({ url, filename: result.filename, skipped: result.skippedFiles });
+      await api("/api/v1/exports", {
+        method: "POST",
+        tenantSlug,
+        body: { enrolmentId },
+        idempotencyKey: crypto.randomUUID(),
+      }).catch(() => undefined);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The export could not be built.");
+    } finally {
+      setBusy(false);
+      setProgress(null);
     }
-    setBusy(false);
   }
 
   async function changeLifecycle(action: "finish" | "reopen") {
@@ -93,30 +80,36 @@ export function DiaryExportClient({
       <section style={{ border: "1px solid var(--rule)", padding: "var(--space-4)", marginBottom: "var(--space-5)" }}>
         <h2 style={{ marginBottom: "var(--space-2)" }}>Download everything</h2>
         <p style={{ marginBottom: "var(--space-3)" }}>
-          The ZIP contains a readable PDF, structured JSON, every retained active or archived
-          entry, original clean attachments, a manifest, and checksums. Deleted entries, edit
-          history, and security logs are excluded.
+          The ZIP is built here in your browser from your encrypted diary: a readable PDF,
+          structured JSON, every retained active or archived entry, your original files, a
+          manifest and checksums. Nothing readable is sent to the server. Deleted entries,
+          edit history and security logs are excluded.
         </p>
-        {diaryState === "open" ? (
-          <button className={forms.buttonPrimary} type="button" disabled={busy} onClick={() => void requestExport()}>
-            {busy ? "Requesting…" : "Create complete export"}
-          </button>
+        <button className={forms.buttonPrimary} type="button" disabled={busy || !lock.key} onClick={() => void buildExport()}>
+          {busy ? "Building…" : "Build my export"}
+        </button>
+        {progress ? (
+          <p role="status" className="stamp" style={{ marginTop: "var(--space-3)" }}>
+            [{progress.step.toUpperCase()}{progress.total ? ` ${progress.done} / ${progress.total}` : ""}]
+          </p>
         ) : null}
-
-        {currentExport ? (
+        {built ? (
           <div aria-live="polite" style={{ marginTop: "var(--space-3)" }}>
-            <p className="stamp">[EXPORT {currentExport.status.toUpperCase()}]</p>
-            {currentExport.status === "ready" ? (
-              <a
-                className={forms.buttonPrimary}
-                style={{ display: "inline-flex", marginTop: "var(--space-2)" }}
-                href={`/api/v1/exports/${currentExport.id}/download?tenant=${encodeURIComponent(tenantSlug)}`}
-              >
-                Download ZIP
-              </a>
-            ) : null}
-            {currentExport.status === "failed" ? (
-              <p role="alert">{currentExport.failureDetail ?? "Export generation failed. Request another export."}</p>
+            <p className="stamp">[EXPORT READY]</p>
+            <a
+              className={forms.buttonPrimary}
+              style={{ display: "inline-flex", marginTop: "var(--space-2)" }}
+              href={built.url}
+              download={built.filename}
+              onClick={() => setDownloadedFirst(true)}
+            >
+              Download ZIP
+            </a>
+            {built.skipped.length > 0 ? (
+              <p role="alert" style={{ marginTop: "var(--space-2)" }}>
+                {built.skipped.length} file{built.skipped.length === 1 ? " was" : "s were"} not included (still being
+                checked or unavailable): {built.skipped.join(", ")}.
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -127,17 +120,23 @@ export function DiaryExportClient({
           {diaryState === "open" ? "Finish diary" : "Diary finished"}
         </h2>
         {diaryState === "open" ? (
-          <p>
-            Finishing makes the diary read-only and starts a 90-day download window. You may
-            reopen it at any point during that window, which cancels deletion and restores editing.
-          </p>
+          <>
+            <p>
+              Finishing makes the diary read-only and starts a 90-day window after which it is
+              permanently deleted. You may reopen it at any point during that window.
+            </p>
+            <p style={{ marginTop: "var(--space-2)", fontWeight: 700 }}>
+              Because your diary is encrypted, no copy can be made for you: download your export
+              above before finishing.
+            </p>
+          </>
         ) : (
           <p>
             This diary is read-only and is scheduled for deletion
             {accessEndsAt
               ? ` on ${new Intl.DateTimeFormat("en-GB", { dateStyle: "long" }).format(new Date(accessEndsAt))}`
               : " after the export window"}.
-            You may reopen it before then.
+            You may reopen it before then, and you can still build an export while it exists.
           </p>
         )}
         <div className={forms.field} style={{ marginTop: "var(--space-3)" }}>
@@ -151,10 +150,16 @@ export function DiaryExportClient({
             onChange={(event) => setConfirmation(event.target.value)}
           />
         </div>
+        {diaryState === "open" ? (
+          <label className={forms.checkboxRow} style={{ marginBottom: "var(--space-3)" }}>
+            <input type="checkbox" checked={downloadedFirst} onChange={(event) => setDownloadedFirst(event.target.checked)} />
+            <span>I have downloaded my export (or I do not want a copy).</span>
+          </label>
+        ) : null}
         <button
           type="button"
           className={diaryState === "open" ? forms.buttonPrimary : forms.buttonSecondary}
-          disabled={busy || confirmation !== phrase}
+          disabled={busy || confirmation !== phrase || (diaryState === "open" && !downloadedFirst)}
           onClick={() => void changeLifecycle(diaryState === "open" ? "finish" : "reopen")}
         >
           {diaryState === "open" ? "Finish my diary" : "Reopen my diary"}

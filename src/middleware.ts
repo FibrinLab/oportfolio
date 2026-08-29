@@ -8,7 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 // applies it to the inline scripts it emits for hydration. Without that,
 // 'strict-dynamic' + nonce would block the app's own scripts in production.
 
-export function proxy(request: NextRequest) {
+// Keep this as Edge Middleware while Cloudflare's OpenNext adapter does not
+// support the Node.js Proxy runtime introduced by Next.js 16.
+export function middleware(request: NextRequest) {
   const nonceBytes = new Uint8Array(16);
   crypto.getRandomValues(nonceBytes);
   const nonce = btoa(String.fromCharCode(...nonceBytes));

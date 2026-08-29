@@ -1,3 +1,4 @@
+import { DiaryLockGate } from "@/components/lock/DiaryLockGate";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -5,6 +6,8 @@ import { getActor, resolveTenant } from "@/server/policy/actor";
 import { getOwnEnrolment } from "@/server/framework/queries";
 import { listEvidence } from "@/server/portfolio/evidence";
 import { formatDateUk } from "@/lib/dates";
+import { aad } from "@/lib/crypto/envelope";
+import { SealedText } from "@/components/lock/Sealed";
 
 export const metadata: Metadata = { title: "Diary" };
 
@@ -34,7 +37,7 @@ export default async function LogPage({
   }
 
   return (
-    <>
+    <DiaryLockGate>
       <div
         style={{
           display: "flex",
@@ -122,7 +125,7 @@ export default async function LogPage({
                 >
                   <span>
                     <Link href={`/t/${tenantSlug}/log/${item.id}`} style={{ fontWeight: 700 }}>
-                      {item.title}
+                      <SealedText envelope={item.titleEnc} aad={aad.evidenceTitle(item.id)} fallback={item.title || "(untitled)"} />
                     </Link>
                     <span style={{ display: "block", fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
                       {item.activityDate ? `${formatDateUk(item.activityDate)} · ` : ""}
@@ -141,6 +144,6 @@ export default async function LogPage({
           </section>
         ))
       )}
-    </>
+    </DiaryLockGate>
   );
 }

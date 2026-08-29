@@ -41,9 +41,11 @@ The screening outcome is therefore **full DPIA required**.
 |---|---|---|---|---|
 | Account | email address, display name (derived from email or chosen), user id, status, last sign-in time | Data subject | `app_user` (PostgreSQL) | Life of account; see §2.1 retention notes |
 | Profile (optional) | preferred name, professional group, specialty/role, organisation, accessibility preferences | Data subject | `profile` | Life of account |
-| Diary content | entry titles, dates, free-text reflections (rich text stored as sanitised JSON), optional entry type, curriculum objective mappings, external links | Data subject | `evidence_item`, `evidence_revision`, mapping tables | Until the author archives/deletes, or 90 days after the diary is finished; then purged unless a retention hold is recorded |
-| Attachments | user-uploaded files (PDF, images, text, DOCX/PPTX ≤ 25 MB), filename, checksum, scan result | Data subject | Object storage: quarantine → clean bucket | As diary content; deleted with the entry / purge |
-| Exports | ZIP archive (PDF + JSON + attachments + manifest) generated on request | Derived | Export bucket + `export_job` | Deleted automatically on expiry (short-lived signed download links, 5 min) |
+| Diary content | entry titles and free-text reflections, link URLs/labels, file names — **end-to-end encrypted in the browser (ADR-007)**; the server holds AES-256-GCM ciphertext only | Data subject | `evidence_item.content_enc`, `evidence_revision`, `external_link.link_enc`, `attachment.name_enc` | Until the author archives/deletes, or 90 days after the diary is finished; then purged unless a retention hold is recorded |
+| Diary metadata (clear) | dates, entry type, curriculum objective mappings, timestamps, file sizes, scan state | Data subject | `evidence_item`, mapping tables | As above |
+| Attachments | user-uploaded files (≤ 25 MB) as encrypted `OPE1` containers; ciphertext checksum | Data subject | Object storage: quarantine → clean bucket (`sealed`) | As diary content; deleted with the entry / purge |
+| Key material | diary key wrapped under passphrase-derived and recovery-key-derived KEKs, KDF parameters | Browser | `diary_key` | Life of account |
+| Exports | built **in the browser**; the server records only that an export was requested | Derived | `export_job` (metadata) | n/a — nothing readable is stored |
 | Authentication | magic-link token **hashes**, session token **hashes**, expiry timestamps | System | `magic_link_token`, `auth_session` | Spent/expired tokens purged after 7 days; revoked sessions after 30 days |
 | Rate limiting | normalised email and client IP as counter keys | System | `login_rate` | 24 hours |
 | Audit log | actor id, action, target type/id, tenant, request id, timestamp, hash chain — **never content** | System | `audit_event` (append-only) | Life of tenant; retained after account deletion as an integrity/accountability record |
@@ -140,9 +142,11 @@ contact address are answered within one month.
 **International transfers.** None intended. **[TO COMPLETE: confirm every
 sub-processor stores and processes in the UK/EEA or has an IDTA/Addendum.]**
 
-**Transparency.** About page, privacy notice **[TO COMPLETE — publish
-`/privacy` and set `privacy_notice_url` for self-service tenants]**,
-accessibility statement (`/accessibility`), and `security.txt`.
+**Transparency.** About page, privacy notice at `/privacy` (version
+`2026-08-29`; self-service tenants record `controller_name` and
+`privacy_notice_url` at creation), accessibility statement
+(`/accessibility`), and `security.txt`. The notice states plainly that the
+operator can technically access stored data (R3).
 
 **Alternatives considered.** Paper/offline notes (no portability, no
 integrity); a shared e-portfolio with supervisor access (contradicts the
@@ -157,7 +161,9 @@ Likelihood: Remote / Possible / Probable. Severity: Minimal / Significant / Seve
 |---|---|---|---|---|
 | R1 | Unauthorised access to diary content via application vulnerability (broken authorization, XSS, injection) → disclosure of sensitive reflections | Possible | Severe | **High** |
 | R2 | Account takeover via the email channel (intercepted or replayed magic link; compromised mailbox) | Possible | Severe | **High** |
-| R3 | Operator or hosting-provider staff read content directly from the database/storage | Possible | Severe | **High** |
+| R3 | Operator or hosting-provider staff read content directly from the database/storage | Remote (ciphertext only) | Severe | Medium |
+| R3b | Compromised or malicious application code served to the browser exfiltrates the diary key or plaintext | Remote | Severe | Medium |
+| R3c | User loses passphrase and recovery key → diary unrecoverable | Possible | Significant | Medium |
 | R4 | User includes patient-identifiable or third-party data despite rules → unlawful processing of others' data | Probable | Significant | **High** |
 | R5 | Malicious uploaded file harms another user or the platform | Possible | Significant | Medium |
 | R6 | Loss of data (outage, ransomware, failed backup) → user loses their record | Possible | Significant | Medium |
@@ -173,9 +179,11 @@ Likelihood: Remote / Possible / Probable. Severity: Minimal / Significant / Seve
 |---|---|---|---|
 | R1 | Owner-only, default-deny authorization on every route with a generated matrix test (463 cases) and a completeness check that fails when a route is unregistered; uniform not-found on denial; narrative sanitiser; strict nonce CSP, no third-party scripts; CSRF origin checks; dependency audit, CodeQL and container scanning in CI. **Planned:** independent penetration test before live use. | Reduced | Medium until pen test |
 | R2 | Single-use links, 15-minute expiry, consumed only by POST (mail scanners cannot spend them); token hashes only in DB; per-address and per-IP rate limits; sessions with idle/absolute timeouts and rotation; `__Host-` secure cookies; SPF/DKIM/DMARC on the sending domain **[TO COMPLETE at hosting]**. Users are told to protect their mailbox. **Considered:** passkeys/WebAuthn as a second factor — deferred (ADR-006), revisit before scale. | Reduced | Medium |
-| R3 | No in-product read path for anyone but the author; database/storage credentials held only in the platform secret store; access to production limited to the operator; hash-chained audit log for all access that *is* possible in-product. **Planned:** application-level envelope encryption of narrative bodies (spec/12 §encryption) — decide before any second administrator exists; documented exceptional-access policy **[TO COMPLETE]**. | Reduced | Medium — honest limitation: the operator *can* technically read the database; the privacy notice must say so |
-| R4 | Explicit "no patient data" acknowledgement at sign-up (invitation flow) **[TO COMPLETE: add the same acknowledgement to the self-service first sign-in]**; About page and editor guidance; incident runbook: on discovery, the operator asks the author to remove the data and records the incident without copying the content. | Reduced | Medium — relies on user behaviour |
-| R5 | Presigned upload to a quarantine bucket; ClamAV scan + content-type inspection; allow-listed types/sizes; only clean files downloadable, via 5-minute signed URLs with attachment disposition; files never executed or previewed server-side. | Reduced | Low |
+| R3 | **End-to-end encryption (ADR-007):** titles, narratives, links and files are encrypted in the browser under a key wrapped only by the user's passphrase / recovery key; database `CHECK` constraints refuse plaintext on sealed rows; revisions hold ciphertext; exports are built client-side. No in-product read path for anyone but the author; credentials in the platform secret store; audit log. | Eliminated for stored data | Low |
+| R3b | Open-source code; strict nonce-based CSP, no third-party scripts; decrypted content rendered as React elements, never HTML strings; reproducible container images; release process with CI checks. Stated plainly in the privacy notice as the remaining trust assumption. | Reduced | Medium (inherent to any web-delivered E2E client) |
+| R3c | Minimum 12-character passphrase with normalisation; one-time recovery key with copy/download and an explicit "I have stored it" step; passphrase change issues a fresh recovery key; "keep this device unlocked" option. Stated at setup and in the notice. | Reduced | Medium — accepted: this is the price of the operator not holding keys |
+| R4 | Explicit privacy / acceptable-use / no-patient-data confirmation on every sign-in, recorded once per notice version in `notice_acknowledgement` (both invitation and self-service flows); About page and editor guidance; incident runbook: on discovery, the operator asks the author to remove the data and records the incident without copying the content. | Reduced | Medium — relies on user behaviour |
+| R5 | Files are encrypted before upload so the server cannot scan them: the browser applies the type/size allowlist first; sealed files are integrity-checked (`OPE1` container, digest) and stored in a distinct `sealed` state; only the author can download and open them (streamed through the app, decrypted in the browser); the UI warns to attach only trusted files. Legacy plaintext files still go through ClamAV + content-type inspection. | Changed: risk is now confined to the author's own device | Low |
 | R6 | Managed database with automated backups **[TO COMPLETE: provider, PITR, restore test]**; object-storage durability; users can export a complete archive at any time. | Reduced | Low-Medium |
 | R7 | Purge and export-expiry jobs in the worker with integration tests; token/session pruning; monitoring of failed outbox rows **[TO COMPLETE: alerting]**; backup retention bounded **[TO COMPLETE]**. | Reduced | Low |
 | R8 | Privacy notice states that disclosure may be required by law; operator will notify the user unless legally prevented; data minimisation limits what exists to disclose. | Accepted | Medium |
@@ -206,15 +214,14 @@ others normally must pay unless exempt) — **[TO COMPLETE before live use]**.
 
 ### Actions before live use
 
-1. Publish `/privacy` and set `privacy_notice_url`/`controller_name` for
-   self-service tenants; state plainly that the operator can technically
-   access stored data and how that is controlled.
-2. Add the privacy / acceptable-use / no-patient-data acknowledgement to the
-   self-service first sign-in and record it in `notice_acknowledgement`.
+1. ~~Publish `/privacy`~~ — done 29 Aug 2026. Still to do: name the providers
+   in the notice (`PROVIDERS` in `src/app/(public)/privacy/page.tsx`) once
+   hosting is chosen, and keep a written log of every direct production access.
+2. ~~Notice acknowledgement on self-service sign-in~~ — done 29 Aug 2026.
 3. Choose hosting, database, storage and SMTP providers; record region, DPA,
    backup retention and restore test in §2.1, §3 and §6.
 4. Configure SPF/DKIM/DMARC for the sending domain.
 5. Commission an independent penetration test; remediate high/critical.
-6. Decide on envelope encryption for narrative bodies (R3).
+6. ~~Decide on envelope encryption for narrative bodies (R3)~~ — superseded by end-to-end encryption, ADR-007 (29 Aug 2026).
 7. Confirm the ICO data protection fee position.
 8. Sign off Step 7.

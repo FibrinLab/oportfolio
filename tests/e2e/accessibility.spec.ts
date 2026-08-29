@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { signInViaMagicLink } from "./helpers";
+import { onboardFellowIntoDemo } from "./helpers";
 
 // AC-16 foundations: axe checks on every Milestone 1 route plus a
 // keyboard-only pass over the core journey. WCAG 2.2 AA is a release gate
@@ -12,8 +12,11 @@ let fellowContext: BrowserContext;
 let fellowPage: Page;
 
 test.beforeAll(async ({ browser, request }) => {
-  fellowContext = await browser.newContext();
-  fellowPage = await signInViaMagicLink(fellowContext, request, "fiona.fellow@example.org");
+  // A freshly invited fellow in `demo` (pinned FCAI release) with the diary
+  // lock set up — every route below is exercised end-to-end encrypted.
+  const onboarded = await onboardFellowIntoDemo(browser, request);
+  fellowContext = onboarded.context;
+  fellowPage = onboarded.page;
 });
 
 test.afterAll(async () => {

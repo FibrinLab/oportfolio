@@ -11,8 +11,9 @@ import {
   canReadEvidence,
 } from "@/server/policy/policy";
 import type { EvidenceAccess } from "@/server/portfolio/evidence";
-import { checkInitiate } from "./uploadPolicy";
+import { checkInitiate, MAX_FILE_BYTES, MAX_FILES_PER_ITEM } from "./uploadPolicy";
 import { presignCleanDownload, presignQuarantineUpload } from "./s3";
+import { SEALED_FILE_OVERHEAD_BYTES, type Envelope } from "@/lib/crypto/envelope";
 
 // Upload pipeline (spec/07:72-84): initiate -> direct browser upload to the
 // quarantine bucket -> complete -> outbox scan -> clean/quarantined.
@@ -22,7 +23,14 @@ import { presignCleanDownload, presignQuarantineUpload } from "./s3";
 export async function initiateUpload(
   actor: Actor,
   access: EvidenceAccess,
-  input: { filename: string; mediaTypeClaimed: string; sizeBytes: number },
+  input: {
+    filename: string;
+    mediaTypeClaimed: string;
+    sizeBytes: number;
+    attachmentId?: string;
+    encrypted?: boolean;
+    nameEnc?: Envelope;
+  },
   requestId: string | null,
 ): Promise<
   | { ok: true; attachmentId: string; upload: { url: string; fields: Record<string, string> } }
@@ -43,11 +51,29 @@ export async function initiateUpload(
         isNull(attachment.deletedAt),
       ),
     );
+  const existingCount = existing[0]?.count ?? 0;
 
-  const check = checkInitiate({ ...input, existingCount: existing[0]?.count ?? 0 });
-  if (!check.ok) return { ok: false, reason: check.reason! };
+  const sealed = input.encrypted === true;
+  if (sealed) {
+    // Sealed upload (ADR-007): the browser applied the type allowlist before
+    // encrypting; the server can only check what it can see.
+    if (!input.nameEnc) return { ok: false, reason: "Sealed uploads need the sealed file name." };
+    if (input.filename !== "sealed" || input.mediaTypeClaimed !== "application/octet-stream") {
+      return { ok: false, reason: "A sealed upload must not carry a plaintext file name." };
+    }
+    if (input.sizeBytes <= SEALED_FILE_OVERHEAD_BYTES) return { ok: false, reason: "Empty files are not accepted." };
+    if (input.sizeBytes > MAX_FILE_BYTES + SEALED_FILE_OVERHEAD_BYTES) {
+      return { ok: false, reason: "Files must be 25 MB or smaller." };
+    }
+    if (existingCount >= MAX_FILES_PER_ITEM) {
+      return { ok: false, reason: `An entry can have at most ${MAX_FILES_PER_ITEM} files.` };
+    }
+  } else {
+    const check = checkInitiate({ ...input, existingCount });
+    if (!check.ok) return { ok: false, reason: check.reason! };
+  }
 
-  const attachmentId = uuidv7();
+  const attachmentId = input.attachmentId ?? uuidv7();
   const objectKey = `${access.evidence.tenantId}/attachment/${attachmentId}`;
 
   await db.transaction(async (tx) => {
@@ -57,11 +83,13 @@ export async function initiateUpload(
       parentType: "evidence_item",
       parentId: access.evidence.id,
       objectKey,
-      originalFilename: input.filename,
-      displayName: input.filename,
-      mediaTypeClaimed: input.mediaTypeClaimed,
+      originalFilename: sealed ? "sealed" : input.filename,
+      displayName: sealed ? "sealed" : input.filename,
+      mediaTypeClaimed: sealed ? "application/octet-stream" : input.mediaTypeClaimed,
       sizeBytes: input.sizeBytes,
       scanStatus: "awaiting_upload",
+      encrypted: sealed,
+      nameEnc: sealed ? input.nameEnc : null,
       createdBy: actor.userId,
       updatedBy: actor.userId,
     });
@@ -74,7 +102,7 @@ export async function initiateUpload(
       enrolmentId: access.evidence.enrolmentId,
       requestId,
       // Identifiers and sizes only — never the filename (log minimisation).
-      metadata: { sizeBytes: input.sizeBytes, mediaTypeClaimed: input.mediaTypeClaimed },
+      metadata: { sizeBytes: input.sizeBytes, mediaTypeClaimed: input.mediaTypeClaimed, sealed },
     });
   });
 
@@ -136,7 +164,12 @@ export async function issueDownload(
   access: EvidenceAccess,
   attachmentId: string,
   requestId: string | null,
-): Promise<{ ok: true; url: string } | { ok: false }> {
+): Promise<
+  | { ok: true; url: string; objectKey: string; sizeBytes: number; mediaType: string; displayName: string }
+  // Sealed files are streamed through the app and decrypted in the browser.
+  | { ok: true; sealed: true; objectKey: string; sizeBytes: number }
+  | { ok: false }
+> {
   const db = getDb();
   const rows = await db
     .select()
@@ -161,11 +194,6 @@ export async function issueDownload(
   );
   if (!decision.allow) return { ok: false };
 
-  const url = await presignCleanDownload(
-    row.objectKey,
-    row.displayName,
-    row.mediaTypeDetected ?? "application/octet-stream",
-  );
   await appendAudit(getDb(), {
     tenantId: access.evidence.tenantId,
     actorUserId: actor.userId,
@@ -174,8 +202,24 @@ export async function issueDownload(
     targetId: attachmentId,
     enrolmentId: access.evidence.enrolmentId,
     requestId,
+    metadata: { sealed: row.encrypted },
   });
-  return { ok: true, url };
+  if (row.encrypted) {
+    return { ok: true, sealed: true, objectKey: row.objectKey, sizeBytes: row.sizeBytes };
+  }
+  const url = await presignCleanDownload(
+    row.objectKey,
+    row.displayName,
+    row.mediaTypeDetected ?? "application/octet-stream",
+  );
+  return {
+    ok: true,
+    url,
+    objectKey: row.objectKey,
+    sizeBytes: row.sizeBytes,
+    mediaType: row.mediaTypeDetected ?? "application/octet-stream",
+    displayName: row.displayName,
+  };
 }
 
 export async function softDeleteAttachment(
@@ -219,6 +263,8 @@ export async function listAttachments(evidenceId: string, tenantId: string) {
       sizeBytes: attachment.sizeBytes,
       scanStatus: attachment.scanStatus,
       mediaTypeDetected: attachment.mediaTypeDetected,
+      encrypted: attachment.encrypted,
+      nameEnc: attachment.nameEnc,
       createdAt: attachment.createdAt,
     })
     .from(attachment)
@@ -229,5 +275,6 @@ export async function listAttachments(evidenceId: string, tenantId: string) {
         eq(attachment.parentId, evidenceId),
         isNull(attachment.deletedAt),
       ),
-    );
+    )
+    .then((rows) => rows.map((row) => ({ ...row, nameEnc: (row.nameEnc as Envelope | null) ?? null })));
 }

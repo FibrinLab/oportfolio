@@ -11,6 +11,8 @@ import {
   tenant,
 } from "@/server/db/schema";
 import { appendAudit } from "@/server/audit/audit";
+import { getEnv } from "@/server/config/env";
+import { OPERATOR_NAME, PRIVACY_NOTICE_PATH } from "@/lib/notices";
 
 export interface SelfServiceAccount {
   userId: string;
@@ -97,6 +99,9 @@ export async function ensureSelfServiceAccount(
     id: tenantId,
     name: "My diary",
     slug: `diary-${userId}`,
+    // The operator is the controller for self-service diaries (docs/dpia.md).
+    controllerName: `${OPERATOR_NAME} (service operator)`,
+    privacyNoticeUrl: `${getEnv().APP_BASE_URL}${PRIVACY_NOTICE_PATH}`,
     createdBy: userId,
     updatedBy: userId,
   });

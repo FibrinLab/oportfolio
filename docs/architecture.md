@@ -116,3 +116,15 @@ The worker also runs hourly housekeeping: rate-limit rows older than a day,
 spent/expired magic links older than 7 days and revoked/expired sessions older
 than 30 days are deleted (audit rows are never touched). See
 `docs/deployment.md` for the container topology and go-live gates.
+
+## End-to-end encryption (ADR-007)
+
+`src/lib/crypto/` holds the browser crypto (envelopes, key wrapping, recovery
+keys, device store) and the module-level lock store (`DiaryLockContext.tsx`);
+`src/components/lock/` the setup/unlock gate, sealed renderers and the
+legacy-sealing migration. Pages wrap their content in `<DiaryLockGate>`
+*after* their own authorization so uniform not-found responses survive. The
+server validates envelope shape only (`apiSchemas.envelopeSchema`), stores
+ciphertext in `content_enc` / `link_enc` / `name_enc`, enforces no-plaintext
+`CHECK` constraints, streams sealed files through `/api/v1/attachments/:id/download`,
+and serves `/api/v1/enrolments/:id/export-bundle` for the browser-built archive.

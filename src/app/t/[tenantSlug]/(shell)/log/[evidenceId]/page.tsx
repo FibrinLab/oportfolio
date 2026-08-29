@@ -1,3 +1,4 @@
+import { DiaryLockGate } from "@/components/lock/DiaryLockGate";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -12,7 +13,8 @@ import {
   listRevisions,
 } from "@/server/portfolio/evidence";
 import { getEditorContext } from "@/server/portfolio/editorData";
-import { renderNarrativeHtml } from "@/server/portfolio/narrativeDoc";
+import { aad } from "@/lib/crypto/envelope";
+import { SealedFileLink, SealedLinkAnchor, SealedNarrative, SealedText } from "@/components/lock/Sealed";
 import { listAttachments } from "@/server/files/attachments";
 import { listLinks } from "@/server/portfolio/links";
 import { EvidenceEditor } from "@/components/evidence/EvidenceEditor";
@@ -59,6 +61,7 @@ export default async function EvidencePage({
       listLinks(evidence.id, tenantContext.tenantId),
     ]);
     return (
+      <DiaryLockGate>
       <EvidenceEditor
         tenantSlug={tenantSlug}
         enrolmentId={enrolment.id}
@@ -68,6 +71,8 @@ export default async function EvidencePage({
           activityDate: evidence.activityDate,
           evidenceTypeId: evidence.evidenceTypeId,
           narrativeDoc: evidence.narrativeDoc,
+          encrypted: evidence.encrypted,
+          contentEnc: evidence.contentEnc,
           objectiveIds,
           rowVersion: evidence.rowVersion,
         }}
@@ -78,6 +83,7 @@ export default async function EvidencePage({
         initialFiles={files}
         initialLinks={links}
       />
+      </DiaryLockGate>
     );
   }
 
@@ -98,14 +104,16 @@ export default async function EvidencePage({
         .where(inArray(objective.id, objectiveIds))
     : [];
   const revisions = await listRevisions(actor, access);
-  const narrativeHtml = renderNarrativeHtml(evidence.narrativeDoc);
   const [files, links] = await Promise.all([
     listAttachments(evidence.id, tenantContext.tenantId),
     listLinks(evidence.id, tenantContext.tenantId),
   ]);
-  const cleanFiles = files.filter((f) => f.scanStatus === "clean");
+  const cleanFiles = files.filter((f) => f.scanStatus === "clean" || f.scanStatus === "sealed");
+  const titleEnc = evidence.encrypted ? (evidence.contentEnc?.title ?? null) : null;
+  const narrativeEnc = evidence.encrypted ? (evidence.contentEnc?.narrative ?? null) : null;
 
   return (
+    <DiaryLockGate>
     <article style={{ maxWidth: "var(--measure)" }}>
       <nav aria-label="Breadcrumb" style={{ marginBottom: "var(--space-4)", fontSize: "var(--text-sm)" }}>
         <Link href={`/t/${tenantSlug}/log`}>Back to diary</Link>
@@ -114,7 +122,9 @@ export default async function EvidencePage({
       <p className="stamp" style={{ marginBottom: "var(--space-2)" }}>
         [{evidence.deletedAt ? "DELETED — RECOVERABLE" : evidence.archivedAt ? "ARCHIVED" : "PRIVATE DIARY"}]
       </p>
-      <h1 style={{ marginBottom: "var(--space-2)" }}>{evidence.title}</h1>
+      <h1 style={{ marginBottom: "var(--space-2)" }}>
+        <SealedText envelope={titleEnc} aad={aad.evidenceTitle(evidence.id)} fallback={evidence.title || "(untitled)"} />
+      </h1>
       <p style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)", marginBottom: "var(--space-5)" }}>
         {evidence.activityDate ? `Activity ${formatDateUk(evidence.activityDate)} · ` : ""}
         Last updated {formatDateTimeUk(evidence.updatedAt)}
@@ -127,10 +137,14 @@ export default async function EvidencePage({
       <section
         aria-label="Evidence content"
         style={{ borderTop: "2px solid var(--ink)", paddingTop: "var(--space-4)", marginBottom: "var(--space-6)" }}
-        // Safe by construction: renderNarrativeHtml escapes all text and only
-        // emits the allowlisted structure the validator admitted.
-        dangerouslySetInnerHTML={{ __html: narrativeHtml }}
-      />
+      >
+        {/* Rendered as React elements from the (decrypted) document — never HTML strings. */}
+        <SealedNarrative
+          envelope={narrativeEnc}
+          aad={aad.evidenceNarrative(evidence.id)}
+          fallbackDoc={evidence.narrativeDoc}
+        />
+      </section>
 
       <section aria-labelledby="maps-heading" style={{ marginBottom: "var(--space-6)" }}>
         <h2 id="maps-heading" style={{ marginBottom: "var(--space-2)" }}>
@@ -165,9 +179,7 @@ export default async function EvidencePage({
           <ul style={{ listStyle: "none", padding: 0 }}>
             {cleanFiles.map((file) => (
               <li key={file.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--space-2) 0" }}>
-                <a href={`/api/v1/attachments/${file.id}/download?tenant=${tenantSlug}`}>
-                  {file.displayName}
-                </a>{" "}
+                <SealedFileLink file={file} tenantSlug={tenantSlug} />{" "}
                 <span style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
                   ({Math.max(1, Math.round(file.sizeBytes / 1024))} KB)
                 </span>
@@ -175,13 +187,7 @@ export default async function EvidencePage({
             ))}
             {links.map((link) => (
               <li key={link.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--space-2) 0" }}>
-                <a href={link.url} target="_blank" rel="noopener noreferrer" data-external>
-                  {link.label ?? link.host} <span aria-hidden>[↗]</span>
-                  <span className="visually-hidden">(opens external site)</span>
-                </a>{" "}
-                <span style={{ fontSize: "var(--text-sm)", color: "var(--disabled-text)" }}>
-                  ({link.host})
-                </span>
+                <SealedLinkAnchor link={link} />
               </li>
             ))}
           </ul>
@@ -205,5 +211,6 @@ export default async function EvidencePage({
         </ul>
       </section>
     </article>
+    </DiaryLockGate>
   );
 }

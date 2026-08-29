@@ -46,8 +46,7 @@ export default function SignInPage() {
             </p>
             <SignInForm />
             <p className={styles.accountNote}>
-              New here? Your first verified link creates a private diary automatically. No
-              invitation or programme approval is needed.
+              New here? Your first verified link creates a private diary automatically.
             </p>
           </section>
         </section>
@@ -63,13 +62,16 @@ export default function SignInPage() {
           <p>
             Diary content is visible only to you within the service. No fellowship programme
             or supervisor is given access. Reflections may still be subject to lawful
-            disclosure and the service&apos;s privacy and retention terms.
+            disclosure and the service&apos;s{" "}
+            <Link href="/privacy">privacy and retention terms</Link>.
           </p>
         </aside>
       </main>
 
       <footer className={styles.footer}>
         <Link href="/about">About oPortfolio</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/privacy">Privacy</Link>
         <span aria-hidden="true">·</span>
         <Link href="/accessibility">Accessibility</Link>
         <span aria-hidden="true">·</span>

@@ -54,9 +54,9 @@ export default function AboutPage() {
             <p>
               Diary titles, dates, reflections, links, and files are visible only to their
               author within oPortfolio. Creating an account does not give a fellowship
-              programme, supervisor, or employer access. The service privacy notice explains
-              how account data is operated, retained, and handled when disclosure is required
-              by law.
+              programme, supervisor, or employer access. The{" "}
+              <Link href="/privacy">service privacy notice</Link> explains how account data is
+              operated, retained, and handled when disclosure is required by law.
             </p>
           </section>
 
@@ -90,6 +90,8 @@ export default function AboutPage() {
 
       <footer className={styles.footer}>
         <Link href="/sign-in">Sign in</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/privacy">Privacy</Link>
         <span aria-hidden="true">·</span>
         <Link href="/accessibility">Accessibility</Link>
         <span aria-hidden="true">·</span>

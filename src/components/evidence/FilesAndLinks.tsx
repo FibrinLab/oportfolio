@@ -2,31 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/apiClient";
+import { aad, encryptJson, sealFile, type Envelope } from "@/lib/crypto/envelope";
+import { useDiaryLock } from "@/lib/crypto/DiaryLockContext";
+import { checkInitiate } from "@/server/files/uploadPolicy";
+import { SealedFileLink, SealedLinkAnchor, useOpenFileMeta, useOpenLink, type SealedFileRow, type SealedLinkRow } from "@/components/lock/Sealed";
 import forms from "@/components/ds/forms.module.css";
 
-// Files + links panel (spec/06 evidence form): direct-to-quarantine upload
-// with visible scan status, and HTTPS-only external links with the host
-// shown before save. Every upload session requires the no-patient-data
-// confirmation (FR-FI-005).
-
-interface FileRow {
-  id: string;
-  displayName: string;
-  sizeBytes: number;
-  scanStatus: string;
-}
-
-interface LinkRow {
-  id: string;
-  url: string;
-  host: string;
-  label: string | null;
-}
+// Files + links panel (spec/06 evidence form). Everything is sealed in the
+// browser before it leaves (ADR-007): files are encrypted into an OPE1
+// container and uploaded straight to the quarantine bucket; the real file
+// name, type and every link URL travel only inside envelopes. Every upload
+// session still requires the no-patient-data confirmation (FR-FI-005).
 
 const SCAN_LABEL: Record<string, string> = {
   awaiting_upload: "[UPLOADING]",
-  pending_scan: "[SCANNING]",
+  pending_scan: "[CHECKING]",
   clean: "",
+  sealed: "",
   rejected: "[BLOCKED — file failed safety checks]",
   quarantined: "[BLOCKED — file failed safety checks]",
 };
@@ -39,11 +31,12 @@ export function FilesAndLinks({
 }: {
   tenantSlug: string;
   evidenceId: string;
-  initialFiles: FileRow[];
-  initialLinks: LinkRow[];
+  initialFiles: SealedFileRow[];
+  initialLinks: SealedLinkRow[];
 }) {
-  const [files, setFiles] = useState<FileRow[]>(initialFiles);
-  const [links, setLinks] = useState<LinkRow[]>(initialLinks);
+  const lock = useDiaryLock();
+  const [files, setFiles] = useState<SealedFileRow[]>(initialFiles);
+  const [links, setLinks] = useState<SealedLinkRow[]>(initialLinks);
   const [patientConfirmed, setPatientConfirmed] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -52,13 +45,13 @@ export function FilesAndLinks({
   const [linkError, setLinkError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Poll scan status while anything is pending.
+  // Poll status while anything is pending.
   useEffect(() => {
     if (!files.some((f) => f.scanStatus === "pending_scan" || f.scanStatus === "awaiting_upload")) {
       return;
     }
     const interval = setInterval(async () => {
-      const result = await api<{ attachments: FileRow[] }>(
+      const result = await api<{ attachments: SealedFileRow[] }>(
         `/api/v1/diary-entries/${evidenceId}/attachments`,
         { tenantSlug },
       );
@@ -70,10 +63,33 @@ export function FilesAndLinks({
   async function onPickFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || !lock.key) return;
     setUploadError(null);
     setUploading(true);
     try {
+      // The same allowlist the server applied before encryption existed —
+      // now enforced here because the server only sees ciphertext.
+      const check = checkInitiate({
+        filename: file.name,
+        mediaTypeClaimed: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        existingCount: files.length,
+      });
+      if (!check.ok) {
+        setUploadError(check.reason ?? "This file was not accepted.");
+        return;
+      }
+
+      const attachmentId = crypto.randomUUID();
+      const plain = new Uint8Array(await file.arrayBuffer());
+      const nameEnc = await encryptJson(
+        lock.key,
+        lock.keyVersion,
+        { name: file.name, mediaType: file.type || "application/octet-stream", size: file.size },
+        aad.attachmentName(attachmentId),
+      );
+      const sealed = await sealFile(lock.key, plain, aad.attachmentBytes(attachmentId));
+
       const initiate = await api<{
         attachmentId: string;
         upload: { url: string; fields: Record<string, string> };
@@ -82,10 +98,13 @@ export function FilesAndLinks({
         tenantSlug,
         body: {
           entryId: evidenceId,
-          filename: file.name,
-          mediaTypeClaimed: file.type || "application/octet-stream",
-          sizeBytes: file.size,
+          filename: "sealed",
+          mediaTypeClaimed: "application/octet-stream",
+          sizeBytes: sealed.length,
           patientDataConfirmed: true,
+          attachmentId,
+          encrypted: true,
+          nameEnc,
         },
       });
       if (!initiate.ok) {
@@ -93,16 +112,13 @@ export function FilesAndLinks({
         return;
       }
 
-      // Direct browser upload to the quarantine bucket (presigned POST).
+      // Direct browser upload of the sealed bytes to the quarantine bucket.
       const formData = new FormData();
       for (const [key, value] of Object.entries(initiate.data.upload.fields)) {
         formData.append(key, value);
       }
-      formData.append("file", file);
-      const uploadResponse = await fetch(initiate.data.upload.url, {
-        method: "POST",
-        body: formData,
-      });
+      formData.append("file", new Blob([sealed as BlobPart], { type: "application/octet-stream" }), "sealed");
+      const uploadResponse = await fetch(initiate.data.upload.url, { method: "POST", body: formData });
       if (!uploadResponse.ok) {
         setUploadError("The upload failed. Try again.");
         return;
@@ -120,8 +136,10 @@ export function FilesAndLinks({
         ...current,
         {
           id: initiate.data.attachmentId,
-          displayName: file.name,
-          sizeBytes: file.size,
+          encrypted: true,
+          nameEnc,
+          displayName: "sealed",
+          sizeBytes: sealed.length,
           scanStatus: "pending_scan",
         },
       ]);
@@ -138,22 +156,40 @@ export function FilesAndLinks({
   async function onAddLink(event: React.FormEvent) {
     event.preventDefault();
     setLinkError(null);
-    const result = await api<{ id: string; host: string }>(
-      `/api/v1/diary-entries/${evidenceId}/links`,
-      {
-        method: "POST",
-        tenantSlug,
-        body: { url: linkUrl.trim(), label: linkLabel.trim() || undefined },
-      },
+    if (!lock.key) return;
+    let parsed: URL;
+    try {
+      parsed = new URL(linkUrl.trim());
+    } catch {
+      setLinkError("Enter a full link starting with https://");
+      return;
+    }
+    if (parsed.protocol !== "https:") {
+      setLinkError("Links must use https.");
+      return;
+    }
+    if (parsed.username || parsed.password) {
+      setLinkError("Links must not contain credentials.");
+      return;
+    }
+    const id = crypto.randomUUID();
+    const label = linkLabel.trim() || null;
+    const linkEnc: Envelope = await encryptJson(
+      lock.key,
+      lock.keyVersion,
+      { url: parsed.toString(), host: parsed.host, label },
+      aad.link(id),
     );
+    const result = await api<{ id: string }>(`/api/v1/diary-entries/${evidenceId}/links`, {
+      method: "POST",
+      tenantSlug,
+      body: { id, linkEnc },
+    });
     if (!result.ok) {
       setLinkError(String(result.problem.detail ?? "The link could not be added."));
       return;
     }
-    setLinks((current) => [
-      ...current,
-      { id: result.data.id, url: linkUrl.trim(), host: result.data.host, label: linkLabel.trim() || null },
-    ]);
+    setLinks((current) => [...current, { id, encrypted: true, linkEnc, url: "", host: "", label: null }]);
     setLinkUrl("");
     setLinkLabel("");
   }
@@ -175,34 +211,7 @@ export function FilesAndLinks({
         {files.length > 0 ? (
           <ul style={{ listStyle: "none", padding: 0, marginBottom: "var(--space-3)" }}>
             {files.map((file) => (
-              <li
-                key={file.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "var(--space-2)",
-                  borderBottom: "1px solid var(--rule)",
-                  padding: "var(--space-2) 0",
-                  fontSize: "var(--text-sm)",
-                }}
-              >
-                <span>
-                  {file.scanStatus === "clean" ? (
-                    <a href={`/api/v1/attachments/${file.id}/download?tenant=${tenantSlug}`}>
-                      {file.displayName}
-                    </a>
-                  ) : (
-                    <>
-                      {file.displayName}{" "}
-                      <span className="stamp">{SCAN_LABEL[file.scanStatus] ?? file.scanStatus}</span>
-                    </>
-                  )}
-                </span>
-                <button type="button" className={forms.buttonTertiary} onClick={() => void onRemoveFile(file.id)}>
-                  Remove {file.displayName}
-                </button>
-              </li>
+              <FileRowItem key={file.id} file={file} tenantSlug={tenantSlug} onRemove={() => void onRemoveFile(file.id)} />
             ))}
           </ul>
         ) : null}
@@ -229,14 +238,15 @@ export function FilesAndLinks({
         <button
           type="button"
           className={forms.buttonSecondary}
-          disabled={!patientConfirmed || uploading}
+          disabled={!patientConfirmed || uploading || !lock.key}
           onClick={() => fileInputRef.current?.click()}
         >
-          {uploading ? "Uploading…" : "Add a file"}
+          {uploading ? "Encrypting and uploading…" : "Add a file"}
         </button>
         <p className={forms.hint} style={{ marginTop: "var(--space-2)" }}>
           Up to 10 files, 25 MB each. PDF, PNG, JPEG, plain text, Markdown, CSV, DOCX, PPTX.
-          Files are safety-checked before they can be opened or included in an export.
+          Files are encrypted in your browser before upload, so the service cannot open or
+          virus-scan them — only attach files you trust.
         </p>
         {uploadError ? (
           <p role="alert" className={forms.error}>
@@ -251,33 +261,7 @@ export function FilesAndLinks({
         {links.length > 0 ? (
           <ul style={{ listStyle: "none", padding: 0, marginBottom: "var(--space-3)" }}>
             {links.map((link) => (
-              <li
-                key={link.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "var(--space-2)",
-                  borderBottom: "1px solid var(--rule)",
-                  padding: "var(--space-2) 0",
-                  fontSize: "var(--text-sm)",
-                }}
-              >
-                <span>
-                  <a href={link.url} target="_blank" rel="noopener noreferrer" data-external>
-                    {link.label ?? link.host} <span aria-hidden>[↗]</span>
-                    <span className="visually-hidden">(opens external site)</span>
-                  </a>{" "}
-                  <span style={{ color: "var(--disabled-text)" }}>({link.host})</span>
-                </span>
-                <button
-                  type="button"
-                  className={forms.buttonTertiary}
-                  onClick={() => void onRemoveLink(link.id)}
-                >
-                  Remove {link.label ?? link.host}
-                </button>
-              </li>
+              <LinkRowItem key={link.id} link={link} onRemove={() => void onRemoveLink(link.id)} />
             ))}
           </ul>
         ) : null}
@@ -325,12 +309,69 @@ export function FilesAndLinks({
         <button
           type="button"
           className={forms.buttonSecondary}
-          disabled={!linkUrl.trim()}
+          disabled={!linkUrl.trim() || !lock.key}
           onClick={(event) => void onAddLink(event)}
         >
           Add link
         </button>
       </fieldset>
     </div>
+  );
+}
+
+function FileRowItem({ file, tenantSlug, onRemove }: { file: SealedFileRow; tenantSlug: string; onRemove: () => void }) {
+  const meta = useOpenFileMeta(file);
+  const name = meta && meta !== "failed" ? meta.name : "file";
+  const downloadable = file.scanStatus === "clean" || file.scanStatus === "sealed";
+  return (
+    <li
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "var(--space-2)",
+        borderBottom: "1px solid var(--rule)",
+        padding: "var(--space-2) 0",
+        fontSize: "var(--text-sm)",
+      }}
+    >
+      <span>
+        {downloadable ? (
+          <SealedFileLink file={file} tenantSlug={tenantSlug} />
+        ) : (
+          <>
+            {name} <span className="stamp">{SCAN_LABEL[file.scanStatus] ?? file.scanStatus}</span>
+          </>
+        )}
+      </span>
+      <button type="button" className={forms.buttonTertiary} onClick={onRemove}>
+        Remove {name}
+      </button>
+    </li>
+  );
+}
+
+function LinkRowItem({ link, onRemove }: { link: SealedLinkRow; onRemove: () => void }) {
+  const open = useOpenLink(link);
+  const name = open && open !== "failed" ? (open.label ?? open.host) : "link";
+  return (
+    <li
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "var(--space-2)",
+        borderBottom: "1px solid var(--rule)",
+        padding: "var(--space-2) 0",
+        fontSize: "var(--text-sm)",
+      }}
+    >
+      <span>
+        <SealedLinkAnchor link={link} />
+      </span>
+      <button type="button" className={forms.buttonTertiary} onClick={onRemove}>
+        Remove {name}
+      </button>
+    </li>
   );
 }

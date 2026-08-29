@@ -157,7 +157,11 @@ export function canDownloadAttachment(
 ): Decision {
   if (!parentDecision.allow) return parentDecision;
   if (attachment.deletedAt) return deny("deleted");
-  if (attachment.scanStatus !== "clean") return deny("wrong_state");
+  // `sealed` = encrypted in the browser, integrity-checked, not scannable
+  // (ADR-007); only the author can open it, so it is downloadable.
+  if (attachment.scanStatus !== "clean" && attachment.scanStatus !== "sealed") {
+    return deny("wrong_state");
+  }
   return allow;
 }
 

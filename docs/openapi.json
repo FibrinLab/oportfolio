@@ -60,10 +60,37 @@
                     "type": "string",
                     "minLength": 20,
                     "maxLength": 200
+                  },
+                  "acknowledgedNotices": {
+                    "minItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "noticeType": {
+                          "type": "string",
+                          "enum": [
+                            "privacy_notice",
+                            "acceptable_use",
+                            "no_patient_data"
+                          ]
+                        },
+                        "noticeVersion": {
+                          "type": "string",
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "noticeType",
+                        "noticeVersion"
+                      ],
+                      "additionalProperties": false
+                    }
                   }
                 },
                 "required": [
-                  "token"
+                  "token",
+                  "acknowledgedNotices"
                 ],
                 "additionalProperties": false
               }
@@ -276,9 +303,13 @@
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
                 "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
                   "title": {
                     "type": "string",
-                    "minLength": 1,
                     "maxLength": 160
                   },
                   "activityDate": {
@@ -305,13 +336,92 @@
                     ]
                   },
                   "narrativeDoc": {},
+                  "contentEnc": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "object",
+                        "properties": {
+                          "v": {
+                            "type": "number",
+                            "const": 1
+                          },
+                          "alg": {
+                            "type": "string",
+                            "const": "A256GCM"
+                          },
+                          "kid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10000
+                          },
+                          "iv": {
+                            "type": "string",
+                            "minLength": 16,
+                            "maxLength": 24
+                          },
+                          "ct": {
+                            "type": "string",
+                            "minLength": 22,
+                            "maxLength": 1500000
+                          }
+                        },
+                        "required": [
+                          "v",
+                          "alg",
+                          "kid",
+                          "iv",
+                          "ct"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "narrative": {
+                        "type": "object",
+                        "properties": {
+                          "v": {
+                            "type": "number",
+                            "const": 1
+                          },
+                          "alg": {
+                            "type": "string",
+                            "const": "A256GCM"
+                          },
+                          "kid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10000
+                          },
+                          "iv": {
+                            "type": "string",
+                            "minLength": 16,
+                            "maxLength": 24
+                          },
+                          "ct": {
+                            "type": "string",
+                            "minLength": 22,
+                            "maxLength": 1500000
+                          }
+                        },
+                        "required": [
+                          "v",
+                          "alg",
+                          "kid",
+                          "iv",
+                          "ct"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "narrative"
+                    ],
+                    "additionalProperties": false
+                  },
                   "reflectionAcknowledged": {
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "title"
-                ],
                 "additionalProperties": false
               }
             }
@@ -532,6 +642,88 @@
                     ]
                   },
                   "narrativeDoc": {},
+                  "contentEnc": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "object",
+                        "properties": {
+                          "v": {
+                            "type": "number",
+                            "const": 1
+                          },
+                          "alg": {
+                            "type": "string",
+                            "const": "A256GCM"
+                          },
+                          "kid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10000
+                          },
+                          "iv": {
+                            "type": "string",
+                            "minLength": 16,
+                            "maxLength": 24
+                          },
+                          "ct": {
+                            "type": "string",
+                            "minLength": 22,
+                            "maxLength": 1500000
+                          }
+                        },
+                        "required": [
+                          "v",
+                          "alg",
+                          "kid",
+                          "iv",
+                          "ct"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "narrative": {
+                        "type": "object",
+                        "properties": {
+                          "v": {
+                            "type": "number",
+                            "const": 1
+                          },
+                          "alg": {
+                            "type": "string",
+                            "const": "A256GCM"
+                          },
+                          "kid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10000
+                          },
+                          "iv": {
+                            "type": "string",
+                            "minLength": 16,
+                            "maxLength": 24
+                          },
+                          "ct": {
+                            "type": "string",
+                            "minLength": 22,
+                            "maxLength": 1500000
+                          }
+                        },
+                        "required": [
+                          "v",
+                          "alg",
+                          "kid",
+                          "iv",
+                          "ct"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "narrative"
+                    ],
+                    "additionalProperties": false
+                  },
                   "explicitSave": {
                     "type": "boolean"
                   }
@@ -1240,10 +1432,51 @@
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
                 "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
                   "url": {
                     "type": "string",
                     "minLength": 9,
                     "maxLength": 2000
+                  },
+                  "linkEnc": {
+                    "type": "object",
+                    "properties": {
+                      "v": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "alg": {
+                        "type": "string",
+                        "const": "A256GCM"
+                      },
+                      "kid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "iv": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 24
+                      },
+                      "ct": {
+                        "type": "string",
+                        "minLength": 22,
+                        "maxLength": 1500000
+                      }
+                    },
+                    "required": [
+                      "v",
+                      "alg",
+                      "kid",
+                      "iv",
+                      "ct"
+                    ],
+                    "additionalProperties": false
                   },
                   "label": {
                     "type": "string",
@@ -1266,9 +1499,6 @@
                     "maxLength": 1000
                   }
                 },
-                "required": [
-                  "url"
-                ],
                 "additionalProperties": false
               }
             }
@@ -1554,6 +1784,50 @@
                   "patientDataConfirmed": {
                     "type": "boolean",
                     "const": true
+                  },
+                  "attachmentId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "encrypted": {
+                    "type": "boolean"
+                  },
+                  "nameEnc": {
+                    "type": "object",
+                    "properties": {
+                      "v": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "alg": {
+                        "type": "string",
+                        "const": "A256GCM"
+                      },
+                      "kid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "iv": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 24
+                      },
+                      "ct": {
+                        "type": "string",
+                        "minLength": 22,
+                        "maxLength": 1500000
+                      }
+                    },
+                    "required": [
+                      "v",
+                      "alg",
+                      "kid",
+                      "iv",
+                      "ct"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
