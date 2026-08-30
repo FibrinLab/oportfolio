@@ -2,8 +2,31 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "oportfolio",
   "main": "custom-worker.ts",
+  "keep_vars": true,
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_BASE_URL": "https://oportfolio.xyz",
+    "S3_ENDPOINT": "https://610371b5de9811b7d258c7622c23849b.r2.cloudflarestorage.com",
+    "S3_PUBLIC_ENDPOINT": "https://610371b5de9811b7d258c7622c23849b.r2.cloudflarestorage.com",
+    "S3_REGION": "auto",
+    "S3_BUCKET_QUARANTINE": "oportfolio-quarantine",
+    "S3_BUCKET_CLEAN": "oportfolio-clean",
+    "S3_BUCKET_EXPORT": "oportfolio-exports",
+    "SMTP_HOST": "smtp.resend.com",
+    "SMTP_PORT": "465",
+    "SMTP_FROM": "oPortfolio <no-reply@mail.oportfolio.xyz>",
+    "SMTP_USER": "resend",
+    "SMTP_SECURE": "true"
+  },
+  "secrets": {
+    "required": [
+      "DATABASE_URL",
+      "S3_ACCESS_KEY_ID",
+      "S3_SECRET_ACCESS_KEY",
+      "SMTP_PASS"
+    ]
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
