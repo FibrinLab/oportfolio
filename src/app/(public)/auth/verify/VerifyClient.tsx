@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { NOTICE_TYPES, NOTICE_VERSION, PRIVACY_NOTICE_PATH } from "@/lib/notices";
 
 type State = "idle" | "verifying" | "failed";
+
+const USED_LINK_MESSAGE =
+  "This sign-in link has expired or was already used.";
 
 // Finishing sign-in is also where the notices are confirmed (spec/05,
 // docs/dpia.md action 2): a first verified link creates the diary, so this is
@@ -11,11 +15,31 @@ type State = "idle" | "verifying" | "failed";
 // notice version, so confirming again on later sign-ins adds nothing.
 
 export function VerifyClient({ token }: { token: string }) {
+  const router = useRouter();
   const [state, setState] = useState<State>("idle");
   const [confirmed, setConfirmed] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(USED_LINK_MESSAGE);
+  const verificationInFlight = useRef(false);
+
+  async function continueToDiary(): Promise<boolean> {
+    const meResponse = await fetch("/api/v1/me");
+    if (!meResponse.ok) return false;
+
+    const me = await meResponse.json();
+    const slug = me?.memberships?.[0]?.tenantSlug as string | undefined;
+    if (!slug) return false;
+
+    // Replace removes the bearer-token URL from browser history.
+    router.replace(`/t/${slug}/today`);
+    return true;
+  }
 
   async function onContinue() {
-    if (!confirmed) return;
+    // React state is not a synchronous lock. Without this ref, a rapid
+    // double-click can submit the one-time token twice: the first request
+    // signs in successfully while the second reports that the token is used.
+    if (!confirmed || verificationInFlight.current) return;
+    verificationInFlight.current = true;
     setState("verifying");
     try {
       const verifyResponse = await fetch("/api/v1/auth/verify", {
@@ -30,15 +54,31 @@ export function VerifyClient({ token }: { token: string }) {
         }),
       });
       if (!verifyResponse.ok) {
+        // A previous request may already have completed successfully (for
+        // example, an older deployment allowed a double-click). If its
+        // session cookie exists, continue instead of showing a false error.
+        if (await continueToDiary()) return;
+
+        const problem = (await verifyResponse.json().catch(() => null)) as {
+          detail?: unknown;
+        } | null;
+        setErrorMessage(
+          typeof problem?.detail === "string" ? problem.detail : USED_LINK_MESSAGE,
+        );
         setState("failed");
+        verificationInFlight.current = false;
         return;
       }
-      const meResponse = await fetch("/api/v1/me");
-      const me = meResponse.ok ? await meResponse.json() : null;
-      const slug = me?.memberships?.[0]?.tenantSlug as string | undefined;
-      window.location.assign(slug ? `/t/${slug}/today` : "/sign-in");
+
+      if (!(await continueToDiary())) {
+        setErrorMessage("You signed in, but your diary could not be opened. Please try again.");
+        setState("failed");
+        verificationInFlight.current = false;
+      }
     } catch {
+      setErrorMessage("We could not finish signing you in. Check your connection and try again.");
       setState("failed");
+      verificationInFlight.current = false;
     }
   }
 
@@ -46,9 +86,9 @@ export function VerifyClient({ token }: { token: string }) {
     return (
       <div role="alert" style={{ borderLeft: "4px solid var(--ink)", paddingLeft: "var(--space-4)" }}>
         <p style={{ fontWeight: 700 }}>ERROR</p>
+        <p>{errorMessage}</p>
         <p>
-          This sign-in link has expired or was already used.{" "}
-          <a href="/sign-in">Request a new sign-in link</a>.
+          <a href="/sign-in">Return to sign-in</a>.
         </p>
       </div>
     );
