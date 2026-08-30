@@ -29,11 +29,62 @@ export function getTransport(): nodemailer.Transporter {
   return globalForMail.mailTransport;
 }
 
-export async function sendMail(to: string, subject: string, text: string): Promise<void> {
+async function sendWithResendApi(
+  to: string,
+  subject: string,
+  text: string,
+  idempotencyKey?: string,
+): Promise<void> {
+  const env = getEnv();
+  if (!env.SMTP_PASS) {
+    throw new Error("Resend API key is not configured");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.SMTP_PASS}`,
+      "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+    },
+    body: JSON.stringify({
+      from: env.SMTP_FROM,
+      to: [to],
+      subject,
+      text,
+    }),
+  });
+
+  if (!response.ok) {
+    // Keep provider details server-side and bounded. Resend errors do not
+    // include the API key, but avoid logging an arbitrarily large body.
+    const detail = (await response.text()).slice(0, 1_000);
+    throw new Error(`Resend API returned ${response.status}: ${detail}`);
+  }
+}
+
+export async function sendMail(
+  to: string,
+  subject: string,
+  text: string,
+  idempotencyKey?: string,
+): Promise<void> {
+  const env = getEnv();
+
+  // Resend recommends its HTTPS API for Cloudflare Workers. The existing
+  // SMTP password is the Resend API key, so production needs no new secret.
+  if (env.SMTP_HOST.toLowerCase() === "smtp.resend.com") {
+    await sendWithResendApi(to, subject, text, idempotencyKey);
+    return;
+  }
+
   await getTransport().sendMail({
-    from: getEnv().SMTP_FROM,
+    from: env.SMTP_FROM,
     to,
     subject,
     text,
+    ...(idempotencyKey
+      ? { headers: { "Resend-Idempotency-Key": idempotencyKey } }
+      : {}),
   });
 }

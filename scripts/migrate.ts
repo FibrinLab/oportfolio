@@ -1,7 +1,12 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import { loadEnvConfig } from "@next/env";
 import { getEnv } from "@/server/config/env";
+
+// Standalone scripts do not run inside Next.js, so load the same `.env*`
+// files explicitly before resolving runtime configuration.
+loadEnvConfig(process.cwd());
 
 // Applies db/migrations in order (the only schema path — never
 // `drizzle-kit push`). Safe to re-run; runs before the app/worker start in

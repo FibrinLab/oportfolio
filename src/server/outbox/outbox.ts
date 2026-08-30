@@ -93,6 +93,35 @@ export async function claimNext(db: Db): Promise<ClaimedMessage | null> {
   };
 }
 
+export async function claimNextForTopic(
+  db: Db,
+  topic: OutboxTopic,
+): Promise<ClaimedMessage | null> {
+  const result = await db.execute(sql`
+    UPDATE outbox_message SET locked_at = now(), attempts = attempts + 1
+    WHERE id = (
+      SELECT id FROM outbox_message
+      WHERE topic = ${topic}
+        AND done_at IS NULL
+        AND run_after <= now()
+        AND attempts < ${MAX_ATTEMPTS}
+        AND (locked_at IS NULL OR locked_at < now() - interval '5 minutes')
+      ORDER BY run_after
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, topic, payload_json, attempts
+  `);
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id as string,
+    topic: row.topic as OutboxTopic,
+    payload: row.payload_json,
+    attempts: row.attempts as number,
+  };
+}
+
 export async function markDone(db: Db, id: string): Promise<void> {
   await db.execute(sql`UPDATE outbox_message SET done_at = now(), last_error = NULL WHERE id = ${id}`);
 }
