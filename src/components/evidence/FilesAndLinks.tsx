@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/apiClient";
 import { aad, encryptJson, sealFile, type Envelope } from "@/lib/crypto/envelope";
 import { useDiaryLock } from "@/lib/crypto/DiaryLockContext";
-import { checkInitiate } from "@/server/files/uploadPolicy";
+import { MAX_FILE_BYTES, MAX_FILES_PER_ITEM } from "@/server/files/uploadPolicy";
 import { SealedFileLink, SealedLinkAnchor, useOpenFileMeta, useOpenLink, type SealedFileRow, type SealedLinkRow } from "@/components/lock/Sealed";
 import forms from "@/components/ds/forms.module.css";
 
@@ -67,16 +67,19 @@ export function FilesAndLinks({
     setUploadError(null);
     setUploading(true);
     try {
-      // The same allowlist the server applied before encryption existed —
-      // now enforced here because the server only sees ciphertext.
-      const check = checkInitiate({
-        filename: file.name,
-        mediaTypeClaimed: file.type || "application/octet-stream",
-        sizeBytes: file.size,
-        existingCount: files.length,
-      });
-      if (!check.ok) {
-        setUploadError(check.reason ?? "This file was not accepted.");
+      // The server receives only an encrypted OPE1 container, so the original
+      // extension and media type do not need an allowlist. Size and count are
+      // still enforced before encryption and again on the server.
+      if (file.size <= 0) {
+        setUploadError("Empty files are not accepted.");
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        setUploadError("Files must be 25 MB or smaller.");
+        return;
+      }
+      if (files.length >= MAX_FILES_PER_ITEM) {
+        setUploadError(`An entry can have at most ${MAX_FILES_PER_ITEM} files.`);
         return;
       }
 
@@ -90,10 +93,7 @@ export function FilesAndLinks({
       );
       const sealed = await sealFile(lock.key, plain, aad.attachmentBytes(attachmentId));
 
-      const initiate = await api<{
-        attachmentId: string;
-        upload: { url: string; fields: Record<string, string> };
-      }>("/api/v1/attachments/initiate", {
+      const initiate = await api<{ attachmentId: string }>("/api/v1/attachments/initiate", {
         method: "POST",
         tenantSlug,
         body: {
@@ -112,15 +112,27 @@ export function FilesAndLinks({
         return;
       }
 
-      // Direct browser upload of the sealed bytes to the quarantine bucket.
-      const formData = new FormData();
-      for (const [key, value] of Object.entries(initiate.data.upload.fields)) {
-        formData.append(key, value);
-      }
-      formData.append("file", new Blob([sealed as BlobPart], { type: "application/octet-stream" }), "sealed");
-      const uploadResponse = await fetch(initiate.data.upload.url, { method: "POST", body: formData });
+      // R2 does not support presigned HTML-form POST uploads. Send the sealed
+      // bytes through the same-origin Worker, which writes them to the private
+      // quarantine bucket without exposing their contents or credentials.
+      const uploadResponse = await fetch(
+        `/api/v1/attachments/${initiate.data.attachmentId}/content`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "x-tenant": tenantSlug,
+          },
+          body: new Blob([sealed as BlobPart], { type: "application/octet-stream" }),
+        },
+      );
       if (!uploadResponse.ok) {
-        setUploadError("The upload failed. Try again.");
+        const problem = (await uploadResponse.json().catch(() => null)) as {
+          detail?: unknown;
+        } | null;
+        setUploadError(
+          typeof problem?.detail === "string" ? problem.detail : "The upload failed. Try again.",
+        );
         return;
       }
 
@@ -230,7 +242,6 @@ export function FilesAndLinks({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.png,.jpg,.jpeg,.txt,.md,.csv,.docx,.pptx"
           onChange={onPickFile}
           className="visually-hidden"
           id="file-upload-input"
@@ -244,9 +255,9 @@ export function FilesAndLinks({
           {uploading ? "Encrypting and uploading…" : "Add a file"}
         </button>
         <p className={forms.hint} style={{ marginTop: "var(--space-2)" }}>
-          Up to 10 files, 25 MB each. PDF, PNG, JPEG, plain text, Markdown, CSV, DOCX, PPTX.
-          Files are encrypted in your browser before upload, so the service cannot open or
-          virus-scan them — only attach files you trust.
+          Up to 10 files, 25 MB each. Any file type. Files are encrypted in your browser
+          before upload, so the service cannot open or virus-scan them — only attach files
+          you trust.
         </p>
         {uploadError ? (
           <p role="alert" className={forms.error}>

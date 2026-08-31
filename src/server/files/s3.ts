@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
@@ -72,6 +73,17 @@ export async function presignQuarantineUpload(
 
 export async function headQuarantineObject(objectKey: string) {
   return getS3().send(new HeadObjectCommand({ Bucket: quarantineBucket(), Key: objectKey }));
+}
+
+export async function putQuarantineObject(objectKey: string, body: Uint8Array): Promise<void> {
+  await getS3().send(
+    new PutObjectCommand({
+      Bucket: quarantineBucket(),
+      Key: objectKey,
+      Body: body,
+      ContentType: "application/octet-stream",
+    }),
+  );
 }
 
 export async function getQuarantineStream(objectKey: string): Promise<Readable> {

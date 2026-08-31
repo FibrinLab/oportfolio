@@ -352,6 +352,16 @@ export const SURFACES: Surface[] = [
     allowStatus: 201,
   },
   {
+    id: "attachments.content",
+    routeFile: "src/app/api/v1/attachments/[attachmentId]/content/route.ts",
+    kind: "api",
+    method: "PUT",
+    path: (f) => `/api/v1/attachments/${f.cleanAttachmentOnPrivateId}/content`,
+    // The fixture is already clean, so every authenticated persona receives
+    // the same not-found response without writing an object to storage.
+    allowed: [],
+  },
+  {
     id: "attachments.complete",
     routeFile: "src/app/api/v1/attachments/[attachmentId]/complete/route.ts",
     kind: "api",

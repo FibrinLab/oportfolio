@@ -15,12 +15,22 @@ export const POST = withApi({ bodySchema: initiateUploadRequest }, async ({ acto
   const result = await initiateUpload(
     actor,
     access,
-    { filename: body.filename, mediaTypeClaimed: body.mediaTypeClaimed, sizeBytes: body.sizeBytes },
+    {
+      filename: body.filename,
+      mediaTypeClaimed: body.mediaTypeClaimed,
+      sizeBytes: body.sizeBytes,
+      attachmentId: body.attachmentId,
+      encrypted: body.encrypted,
+      nameEnc: body.nameEnc,
+    },
     requestId,
   );
   if (!result.ok) {
     if (result.reason === "denied") return notFoundProblem(requestId);
     return problem("upload-policy", requestId, { detail: result.reason });
   }
-  return NextResponse.json(result, { status: 201 });
+  return NextResponse.json(
+    { ok: true, attachmentId: result.attachmentId },
+    { status: 201 },
+  );
 });

@@ -1741,7 +1741,7 @@
     },
     "/api/v1/attachments/initiate": {
       "post": {
-        "summary": "Authorize an upload: policy checks, then a single-object short-expiry presigned POST to the quarantine bucket",
+        "summary": "Authorize an encrypted attachment upload and create its pending record",
         "parameters": [
           {
             "name": "x-tenant",
@@ -1845,6 +1845,121 @@
         "responses": {
           "201": {
             "description": "Created"
+          },
+          "404": {
+            "description": "Not found — returned both for missing objects and for objects the caller may not read (no existence oracle)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/attachments/{attachmentId}/content": {
+      "put": {
+        "summary": "Upload browser-encrypted attachment bytes to private quarantine storage",
+        "parameters": [
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "x-tenant",
+            "in": "header",
+            "required": false,
+            "description": "Tenant slug; required when the caller belongs to more than one tenant",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
           },
           "404": {
             "description": "Not found — returned both for missing objects and for objects the caller may not read (no existence oracle)",

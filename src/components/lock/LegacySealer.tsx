@@ -105,7 +105,7 @@ export function LegacySealer() {
             aad.attachmentName(attachmentId),
           );
           const sealed = await sealFile(key, plain, aad.attachmentBytes(attachmentId));
-          const initiate = await api<{ attachmentId: string; upload: { url: string; fields: Record<string, string> } }>(
+          const initiate = await api<{ attachmentId: string }>(
             "/api/v1/attachments/initiate",
             {
               method: "POST",
@@ -123,10 +123,17 @@ export function LegacySealer() {
             },
           );
           if (!initiate.ok) throw new Error("initiate failed");
-          const form = new FormData();
-          for (const [k, v] of Object.entries(initiate.data.upload.fields)) form.append(k, v);
-          form.append("file", new Blob([sealed as BlobPart], { type: "application/octet-stream" }), "sealed");
-          const uploaded = await fetch(initiate.data.upload.url, { method: "POST", body: form });
+          const uploaded = await fetch(
+            `/api/v1/attachments/${initiate.data.attachmentId}/content`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/octet-stream",
+                "x-tenant": file.tenantSlug,
+              },
+              body: new Blob([sealed as BlobPart], { type: "application/octet-stream" }),
+            },
+          );
           if (!uploaded.ok) throw new Error("upload failed");
           const completed = await api(`/api/v1/attachments/${attachmentId}/complete`, {
             method: "POST",

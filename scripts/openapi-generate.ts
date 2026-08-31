@@ -201,11 +201,21 @@ const document = {
     },
     "/api/v1/attachments/initiate": {
       post: {
-        summary:
-          "Authorize an upload: policy checks, then a single-object short-expiry presigned POST to the quarantine bucket",
+        summary: "Authorize an encrypted attachment upload and create its pending record",
         parameters: [tenantHeader],
         requestBody: body(schemas.initiateUploadRequest),
         responses: { "201": created, "404": uniform404, "422": problemResponse },
+      },
+    },
+    "/api/v1/attachments/{attachmentId}/content": {
+      put: {
+        summary: "Upload browser-encrypted attachment bytes to private quarantine storage",
+        parameters: [uuidParam("attachmentId"), tenantHeader],
+        requestBody: {
+          required: true,
+          content: { "application/octet-stream": { schema: { type: "string", format: "binary" } } },
+        },
+        responses: { "200": ok, "404": uniform404, "422": problemResponse },
       },
     },
     "/api/v1/attachments/{attachmentId}/complete": {
