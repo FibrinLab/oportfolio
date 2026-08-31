@@ -1,5 +1,4 @@
 import {
-  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -101,12 +100,17 @@ export async function getCleanStream(objectKey: string): Promise<Readable> {
   return result.Body as Readable;
 }
 
-export async function promoteToClean(objectKey: string): Promise<void> {
+export async function promoteToClean(objectKey: string, body: Uint8Array): Promise<void> {
+  // Avoid S3 CopyObject here: its successful XML response is deserialized
+  // through DOMParser, which is unavailable in Cloudflare Workers. The scan
+  // worker already has the size-capped object in memory, so write those same
+  // bytes to the clean bucket and then remove the quarantine copy.
   await getS3().send(
-    new CopyObjectCommand({
+    new PutObjectCommand({
       Bucket: cleanBucket(),
       Key: objectKey,
-      CopySource: `${quarantineBucket()}/${encodeURIComponent(objectKey)}`,
+      Body: body,
+      ContentType: "application/octet-stream",
     }),
   );
   await getS3().send(new DeleteObjectCommand({ Bucket: quarantineBucket(), Key: objectKey }));

@@ -70,7 +70,7 @@ export async function handleScanAttachment(
       });
       return;
     }
-    await promoteToClean(row.objectKey);
+    await promoteToClean(row.objectKey, buffer);
     await db.transaction(async (tx) => {
       await tx
         .update(attachment)
@@ -159,7 +159,7 @@ export async function handleScanAttachment(
   }
 
   // Clean: promote to the clean bucket and delete the quarantine copy.
-  await promoteToClean(row.objectKey);
+  await promoteToClean(row.objectKey, buffer);
   const engine = await clamdVersion();
   await db.transaction(async (tx) => {
     await tx
