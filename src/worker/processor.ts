@@ -60,11 +60,3 @@ export async function processOne(): Promise<boolean> {
   }
   return true;
 }
-
-export async function processOutboxBatch(maxMessages = 20): Promise<number> {
-  let processed = 0;
-  while (processed < maxMessages && (await processOne())) {
-    processed += 1;
-  }
-  return processed;
-}
