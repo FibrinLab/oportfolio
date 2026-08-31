@@ -6,6 +6,7 @@ import handler from "./.open-next/worker.js";
 import { runWithCloudflareRequestContext } from "./.open-next/cloudflare/init.js";
 import { processEmailOutboxBatch } from "./src/worker/emailProcessor";
 import { runHousekeeping } from "./src/worker/housekeeping";
+import { processOutboxBatch } from "./src/worker/processor";
 
 type WorkerEnv = Record<string, unknown> & { APP_BASE_URL?: string };
 type WorkerContext = {
@@ -18,6 +19,9 @@ async function runScheduledWork(env: WorkerEnv, ctx: WorkerContext): Promise<voi
 
   await runWithCloudflareRequestContext(request, env, ctx, async () => {
     await processEmailOutboxBatch(50);
+    // Process attachment scans and the rest of the durable outbox. Without
+    // this, encrypted uploads remain pending forever and exports skip them.
+    await processOutboxBatch(25);
     await runHousekeeping();
     return new Response(null, { status: 204 });
   });
